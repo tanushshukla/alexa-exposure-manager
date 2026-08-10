@@ -361,8 +361,8 @@ class ManagedFileTransaction:
                 categories = raw_metadata["display_categories"]
                 if isinstance(categories, str):
                     categories = [categories]
-                elif isinstance(categories, list) and categories:
-                    categories = [str(categories[0])]
+                elif isinstance(categories, list):
+                    categories = [str(category) for category in categories]
                 else:
                     reasons.append(
                         f"display_categories for {raw_entity_id} uses an "
@@ -372,8 +372,13 @@ class ManagedFileTransaction:
                 valid_categories = self._validate_categories(
                     raw_entity_id, categories, reasons
                 )
-                if valid_categories:
-                    metadata["display_categories"] = valid_categories[:1]
+                if len(valid_categories) > 1:
+                    reasons.append(
+                        f"display_categories for {raw_entity_id} contains "
+                        "more than one category; Home Assistant accepts one"
+                    )
+                elif valid_categories:
+                    metadata["display_categories"] = valid_categories
             parsed_entity_config[raw_entity_id] = metadata
 
         return _ParsedPair(
@@ -431,17 +436,19 @@ class ManagedFileTransaction:
     ) -> list[str]:
         if not categories:
             return []
-        category = categories[0]
-        if (
-            not isinstance(category, str)
-            or category not in self._valid_display_categories
-        ):
-            reasons.append(
-                f"display_categories for {entity_id} contains invalid "
-                f"category {category!r}"
-            )
-            return []
-        return [category]
+        valid: list[str] = []
+        for category in categories:
+            if (
+                not isinstance(category, str)
+                or category not in self._valid_display_categories
+            ):
+                reasons.append(
+                    f"display_categories for {entity_id} contains invalid "
+                    f"category {category!r}"
+                )
+                return []
+            valid.append(category)
+        return valid
 
     @staticmethod
     def _exposure_map(
@@ -537,6 +544,11 @@ class ManagedFileTransaction:
                         f"display_categories for {entity_id} must be a list"
                     )
                 else:
+                    if len(raw_categories) > 1:
+                        raise InvalidManagedConfigurationError(
+                            f"display_categories for {entity_id} must contain "
+                            "at most one category"
+                        )
                     category_reasons: list[str] = []
                     categories = self._validate_categories(
                         entity_id, raw_categories, category_reasons
@@ -595,7 +607,8 @@ class ManagedFileTransaction:
                 if key in source:
                     metadata[key] = source[key]
             if categories := source.get("display_categories"):
-                metadata["display_categories"] = categories[0]
+                if len(categories) == 1:
+                    metadata["display_categories"] = categories[0]
             rendered[entity_id] = metadata
         return yaml.dump(
             rendered,

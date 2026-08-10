@@ -244,6 +244,72 @@ async def test_status_activation_comes_from_resolved_nested_includes(
 
 
 @pytest.mark.asyncio
+async def test_status_activation_ignores_same_named_file_outside_config_dir(
+    tmp_path,
+) -> None:
+    (tmp_path / "configuration.yaml").write_text("alexa: !include alexa.yaml\n")
+    (tmp_path / "alexa.yaml").write_text(
+        "smart_home:\n"
+        "  filter: !include subdir/alexa_exposure_filter.yaml\n"
+        "  entity_config: !include subdir/alexa_entity_config.yaml\n"
+    )
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "subdir" / "alexa_exposure_filter.yaml").write_text(
+        "include_entities:\n  - light.private_entity\n"
+    )
+    (tmp_path / "subdir" / "alexa_entity_config.yaml").write_text("{}\n")
+    hass = HomeAssistant(str(tmp_path))
+    await async_setup(hass, {})
+
+    class Transaction:
+        last_validation = None
+
+        async def async_read(self):
+            return {
+                "revision": "filter-r1",
+                "entities_revision": "entities-r1",
+                "expose_new_entities": False,
+                "read_only": False,
+                "read_only_reasons": [],
+            }
+
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = hass.data[DOMAIN]["startup_alexa"]
+    runtime.transaction = Transaction()
+    runtime.created_files = {"filter": False, "entity_config": False}
+    runtime._state = {
+        "restart_required": False,
+        "migration_state": "not_started",
+        "last_validation": None,
+    }
+
+    connection = await call_command(
+        websocket_status,
+        runtime,
+        {"id": 7, "type": "alexa_exposure_manager/status"},
+    )
+    await hass.async_stop(force=True)
+
+    status = connection.results[0][1]
+    assert status["configured"] is False
+    assert status["activation"] == {
+        "filter": False,
+        "entity_config": False,
+        "issues": [
+            ("alexa.smart_home.filter is not loaded from alexa_exposure_filter.yaml"),
+            (
+                "alexa.smart_home.entity_config is not loaded from "
+                "alexa_entity_config.yaml"
+            ),
+        ],
+    }
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("legacy_filter", "expected_counts"),
     [

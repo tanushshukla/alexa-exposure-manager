@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from custom_components.alexa_exposure_manager.managed_files import (
+    InvalidManagedConfigurationError,
     ManagedFilesError,
     ManagedFileTransaction,
     ManagedYamlReadOnlyError,
@@ -345,7 +346,7 @@ async def test_restore_validation_failure_rolls_back_to_pre_restore_pair(
 
 
 @pytest.mark.asyncio
-async def test_only_primary_display_category_is_written_for_ha_yaml_schema(
+async def test_single_display_category_is_written_as_scalar_for_ha_yaml_schema(
     tmp_path: Path,
 ) -> None:
     managed = transaction(tmp_path)
@@ -360,7 +361,7 @@ async def test_only_primary_display_category_is_written_for_ha_yaml_schema(
             {
                 "entity_id": "light.one",
                 "exposed": True,
-                "display_categories": ["LIGHT", "SWITCH"],
+                "display_categories": ["LIGHT"],
             }
         ],
         known_entity_ids={"light.one"},
@@ -369,6 +370,63 @@ async def test_only_primary_display_category_is_written_for_ha_yaml_schema(
     assert (tmp_path / "alexa_entity_config.yaml").read_text() == (
         "light.one:\n  display_categories: LIGHT\n"
     )
+
+
+@pytest.mark.asyncio
+async def test_multi_category_save_is_rejected_not_truncated(
+    tmp_path: Path,
+) -> None:
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    snapshot = await managed.async_read({"light.one"})
+
+    with pytest.raises(InvalidManagedConfigurationError, match="at most one"):
+        await managed.async_save(
+            expected_revision=snapshot["revision"],
+            expected_entities_revision=snapshot["entities_revision"],
+            expose_new_entities=False,
+            entities=[
+                {
+                    "entity_id": "light.one",
+                    "exposed": True,
+                    "display_categories": ["LIGHT", "SWITCH"],
+                }
+            ],
+            known_entity_ids={"light.one"},
+        )
+
+    assert (tmp_path / "alexa_entity_config.yaml").read_text() == "{}\n"
+
+
+@pytest.mark.asyncio
+async def test_multi_category_managed_file_is_read_only_not_truncated(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "alexa_entity_config.yaml").write_text(
+        "light.one:\n  display_categories:\n    - LIGHT\n    - SWITCH\n"
+    )
+    (tmp_path / "alexa_exposure_filter.yaml").write_text(
+        "include_entities:\n  - light.one\n"
+    )
+    managed = transaction(tmp_path)
+
+    snapshot = await managed.async_read({"light.one"})
+
+    assert snapshot["read_only"] is True
+    assert any(
+        "more than one category" in reason for reason in snapshot["read_only_reasons"]
+    )
+    assert (tmp_path / "alexa_entity_config.yaml").read_text() == (
+        "light.one:\n  display_categories:\n    - LIGHT\n    - SWITCH\n"
+    )
+    with pytest.raises(ManagedYamlReadOnlyError):
+        await managed.async_save(
+            expected_revision=snapshot["revision"],
+            expected_entities_revision=snapshot["entities_revision"],
+            expose_new_entities=False,
+            entities=[],
+            known_entity_ids={"light.one"},
+        )
 
 
 @pytest.mark.asyncio

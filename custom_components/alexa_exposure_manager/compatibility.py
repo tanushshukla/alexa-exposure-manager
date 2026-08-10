@@ -5,9 +5,12 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .const import ENTITY_CONFIG_FILENAME, FILTER_FILENAME
+
+if TYPE_CHECKING:
+    from homeassistant.components.alexa.config import AbstractConfig
 
 
 def sanitize_alexa_mapping(value: Any) -> Any:
@@ -25,14 +28,17 @@ def sanitize_alexa_mapping(value: Any) -> Any:
 
 
 def _annotation_includes_managed_file(
-    annotation: tuple[str, int | str] | None, filename: str
+    annotation: tuple[str, int | str] | None,
+    filename: str,
+    config_dir: str | Path,
 ) -> bool:
-    """Return whether a resolved annotation resolves to the managed file."""
+    """Return whether a resolved annotation is the managed file under config_dir."""
     if annotation is None:
         return False
     source = str(annotation[0])
-    # HA resolves !include to the included file itself — filename match is sufficient.
-    if Path(source).name == filename:
+    managed_path = (Path(config_dir) / filename).resolve()
+    # HA resolves !include to the included file itself — fixed-path match is sufficient.
+    if Path(source).resolve() == managed_path:
         return True
     if not isinstance(annotation[1], int):
         return False
@@ -50,7 +56,8 @@ def _annotation_includes_managed_file(
                 if match is None:
                     return False
                 included = match.group(1).strip()
-                return Path(included).name == filename
+                # Relative include paths resolve against the including file's directory.
+                return (Path(source).parent / included).resolve() == managed_path
     except OSError:
         return False
     return False
@@ -59,11 +66,16 @@ def _annotation_includes_managed_file(
 def _activation_from_annotations(
     filter_annotation: tuple[str, int | str] | None,
     entity_annotation: tuple[str, int | str] | None,
+    config_dir: str | Path,
 ) -> tuple[bool, bool]:
-    """Verify both managed includes without requiring a fixed parent Alexa path."""
+    """Verify both managed includes live under config_dir."""
     return (
-        _annotation_includes_managed_file(filter_annotation, FILTER_FILENAME),
-        _annotation_includes_managed_file(entity_annotation, ENTITY_CONFIG_FILENAME),
+        _annotation_includes_managed_file(
+            filter_annotation, FILTER_FILENAME, config_dir
+        ),
+        _annotation_includes_managed_file(
+            entity_annotation, ENTITY_CONFIG_FILENAME, config_dir
+        ),
     )
 
 
@@ -106,6 +118,7 @@ async def async_resolved_alexa_config(hass) -> dict[str, Any]:
         _activation_from_annotations,
         filter_annotation,
         entity_annotation,
+        hass.config.config_dir,
     )
     issues: list[str] = []
     if not filter_active:
@@ -204,7 +217,11 @@ def alexa_entity_support(
     if adapter_class is None:
         return False, "This entity domain is not supported by Alexa", None
     try:
-        adapter = adapter_class(hass, _CatalogAlexaConfig(entity_config), state)
+        adapter = adapter_class(
+            hass,
+            cast(AbstractConfig, _CatalogAlexaConfig(entity_config)),
+            state,
+        )
         if not list(adapter.interfaces()):
             return False, "This entity has no Alexa-compatible capabilities", None
         categories = adapter.default_display_categories()

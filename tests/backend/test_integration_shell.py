@@ -24,7 +24,7 @@ def test_manifest_declares_installable_single_config_flow_integration() -> None:
     assert manifest["name"] == "Alexa Exposure Manager"
     assert manifest["config_flow"] is True
     assert manifest["version"] == "0.1.0"
-    assert manifest["homeassistant"] == "2026.6.4"
+    assert "homeassistant" not in manifest
     assert manifest["codeowners"] == ["@tanushshukla"]
 
 

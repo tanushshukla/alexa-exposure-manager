@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from typing import Any
 
 import yaml
@@ -38,7 +39,9 @@ class AlexaExposureManagerRuntime:
             lambda: compatibility.async_validate_full_config(hass),
             valid_display_categories=compatibility.alexa_display_categories(),
         )
-        self._store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
+        self._store: Store[dict[str, Any]] = Store(
+            hass, 1, f"{DOMAIN}.{entry.entry_id}"
+        )
         self._state: dict[str, Any] = {
             "restart_required": False,
             "restart_revisions": None,
@@ -95,7 +98,6 @@ class AlexaExposureManagerRuntime:
                 else self._state.get("last_validation")
             ),
             "migration_state": self._state["migration_state"],
-            "display_categories": sorted(compatibility.alexa_display_categories()),
             "discovery_instructions": (
                 "After restart, ask Alexa to discover devices or use the Alexa app."
             ),
@@ -241,7 +243,7 @@ class AlexaExposureManagerRuntime:
             if isinstance(entity_id, str)
         } | set(legacy_metadata)
         missing_ids = configured_ids - current_ids
-        proposed_entities: list[dict[str, Any]] = []
+        proposed_entities: list[Mapping[str, Any]] = []
         counts = {"exposed": 0, "hidden": 0, "unsupported": 0, "missing": 0}
         for entity in catalog:
             if entity["missing"]:
@@ -344,7 +346,7 @@ class AlexaExposureManagerRuntime:
             expected_entities_revision=message["expected_entities_revision"],
         )
         await self._record_restart_required(result)
-        return {**result, "last_validation": self._state.get("last_validation")}
+        return result
 
     async def async_restart(self, user_id: str) -> dict[str, bool]:
         """Call Home Assistant's restart service with the requesting user context."""

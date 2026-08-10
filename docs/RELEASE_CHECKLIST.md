@@ -11,7 +11,8 @@ canonical v1 specification.
 - [ ] `custom_components/alexa_exposure_manager` contains the complete runtime.
 - [ ] `manifest.json` declares domain, name, version `0.1.0`, documentation,
   issue tracker, code owners, config flow, and valid integration metadata.
-- [ ] English translation resources cover all user-facing strings.
+- [ ] Config flow strings use Home Assistant translation resources and the
+  panel ships its English strings compiled into the custom panel.
 - [ ] The production panel is Lit and bundled with the integration.
 - [ ] Standalone React runtime and sample data are absent from the release.
 - [ ] `hacs.json` minimum versions match supported policy.

@@ -78,7 +78,8 @@ managed representation, so existing exposure does not change unexpectedly.
 - Touch targets follow Home Assistant component sizing.
 - Status changes use appropriate live-region behavior without excessive
   announcements.
-- All user-facing strings use Home Assistant translation resources under
-  `component.alexa_exposure_manager.*`, with English as the initial language.
-  The Lit panel prefers `hass.localize` and falls back to the shipped English
-  catalog when a key is not loaded yet.
+- Config flow strings use Home Assistant translation resources under
+  `component.alexa_exposure_manager.*`. The Lit panel ships its English strings
+  compiled into the panel for v1 because Home Assistant has no translation
+  category for custom panel UI; a future release can adopt a recognized backend
+  translation category to localize the panel.

@@ -29,7 +29,7 @@ var e = globalThis, t = e.ShadowRoot && (e.ShadyCSS === void 0 || e.ShadyCSS.nat
 	let t = "";
 	for (let n of e.cssRules) t += n.cssText;
 	return a(t);
-})(e) : e, { is: l, defineProperty: u, getOwnPropertyDescriptor: d, getOwnPropertyNames: ee, getOwnPropertySymbols: te, getPrototypeOf: ne } = Object, f = globalThis, p = f.trustedTypes, re = p ? p.emptyScript : "", ie = f.reactiveElementPolyfillSupport, m = (e, t) => e, h = {
+})(e) : e, { is: l, defineProperty: u, getOwnPropertyDescriptor: d, getOwnPropertyNames: ee, getOwnPropertySymbols: te, getPrototypeOf: ne } = Object, f = globalThis, p = f.trustedTypes, re = p ? p.emptyScript : "", m = f.reactiveElementPolyfillSupport, h = (e, t) => e, g = {
 	toAttribute(e, t) {
 		switch (t) {
 			case Boolean:
@@ -58,23 +58,23 @@ var e = globalThis, t = e.ShadowRoot && (e.ShadyCSS === void 0 || e.ShadyCSS.nat
 		}
 		return n;
 	}
-}, g = (e, t) => !l(e, t), _ = {
+}, _ = (e, t) => !l(e, t), v = {
 	attribute: !0,
 	type: String,
-	converter: h,
+	converter: g,
 	reflect: !1,
 	useDefault: !1,
-	hasChanged: g
+	hasChanged: _
 };
 Symbol.metadata ??= Symbol("metadata"), f.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
-var v = class extends HTMLElement {
+var y = class extends HTMLElement {
 	static addInitializer(e) {
 		this._$Ei(), (this.l ??= []).push(e);
 	}
 	static get observedAttributes() {
 		return this.finalize(), this._$Eh && [...this._$Eh.keys()];
 	}
-	static createProperty(e, t = _) {
+	static createProperty(e, t = v) {
 		if (t.state && (t.attribute = !1), this._$Ei(), this.prototype.hasOwnProperty(e) && ((t = Object.create(t)).wrapped = !0), this.elementProperties.set(e, t), !t.noAccessor) {
 			let n = Symbol(), r = this.getPropertyDescriptor(e, n, t);
 			r !== void 0 && u(this.prototype, e, r);
@@ -100,16 +100,16 @@ var v = class extends HTMLElement {
 		};
 	}
 	static getPropertyOptions(e) {
-		return this.elementProperties.get(e) ?? _;
+		return this.elementProperties.get(e) ?? v;
 	}
 	static _$Ei() {
-		if (this.hasOwnProperty(m("elementProperties"))) return;
+		if (this.hasOwnProperty(h("elementProperties"))) return;
 		let e = ne(this);
 		e.finalize(), e.l !== void 0 && (this.l = [...e.l]), this.elementProperties = new Map(e.elementProperties);
 	}
 	static finalize() {
-		if (this.hasOwnProperty(m("finalized"))) return;
-		if (this.finalized = !0, this._$Ei(), this.hasOwnProperty(m("properties"))) {
+		if (this.hasOwnProperty(h("finalized"))) return;
+		if (this.finalized = !0, this._$Ei(), this.hasOwnProperty(h("properties"))) {
 			let e = this.properties, t = [...ee(e), ...te(e)];
 			for (let n of t) this.createProperty(n, e[n]);
 		}
@@ -171,14 +171,14 @@ var v = class extends HTMLElement {
 	_$ET(e, t) {
 		let n = this.constructor.elementProperties.get(e), r = this.constructor._$Eu(e, n);
 		if (r !== void 0 && !0 === n.reflect) {
-			let i = (n.converter?.toAttribute === void 0 ? h : n.converter).toAttribute(t, n.type);
+			let i = (n.converter?.toAttribute === void 0 ? g : n.converter).toAttribute(t, n.type);
 			this._$Em = e, i == null ? this.removeAttribute(r) : this.setAttribute(r, i), this._$Em = null;
 		}
 	}
 	_$AK(e, t) {
 		let n = this.constructor, r = n._$Eh.get(e);
 		if (r !== void 0 && this._$Em !== r) {
-			let e = n.getPropertyOptions(r), i = typeof e.converter == "function" ? { fromAttribute: e.converter } : e.converter?.fromAttribute === void 0 ? h : e.converter;
+			let e = n.getPropertyOptions(r), i = typeof e.converter == "function" ? { fromAttribute: e.converter } : e.converter?.fromAttribute === void 0 ? g : e.converter;
 			this._$Em = r;
 			let a = i.fromAttribute(t, e.type);
 			this[r] = a ?? this._$Ej?.get(r) ?? a, this._$Em = null;
@@ -187,7 +187,7 @@ var v = class extends HTMLElement {
 	requestUpdate(e, t, n, r = !1, i) {
 		if (e !== void 0) {
 			let a = this.constructor;
-			if (!1 === r && (i = this[e]), n ??= a.getPropertyOptions(e), !((n.hasChanged ?? g)(i, t) || n.useDefault && n.reflect && i === this._$Ej?.get(e) && !this.hasAttribute(a._$Eu(e, n)))) return;
+			if (!1 === r && (i = this[e]), n ??= a.getPropertyOptions(e), !((n.hasChanged ?? _)(i, t) || n.useDefault && n.reflect && i === this._$Ej?.get(e) && !this.hasAttribute(a._$Eu(e, n)))) return;
 			this.C(e, t, n);
 		}
 		!1 === this.isUpdatePending && (this._$ES = this._$EP());
@@ -251,89 +251,89 @@ var v = class extends HTMLElement {
 	updated(e) {}
 	firstUpdated(e) {}
 };
-v.elementStyles = [], v.shadowRootOptions = { mode: "open" }, v[m("elementProperties")] = /* @__PURE__ */ new Map(), v[m("finalized")] = /* @__PURE__ */ new Map(), ie?.({ ReactiveElement: v }), (f.reactiveElementVersions ??= []).push("2.1.2");
+y.elementStyles = [], y.shadowRootOptions = { mode: "open" }, y[h("elementProperties")] = /* @__PURE__ */ new Map(), y[h("finalized")] = /* @__PURE__ */ new Map(), m?.({ ReactiveElement: y }), (f.reactiveElementVersions ??= []).push("2.1.2");
 //#endregion
 //#region node_modules/lit-html/lit-html.js
-var y = globalThis, b = (e) => e, x = y.trustedTypes, S = x ? x.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, C = "$lit$", w = `lit$${Math.random().toFixed(9).slice(2)}$`, T = "?" + w, ae = `<${T}>`, E = document, D = () => E.createComment(""), O = (e) => e === null || typeof e != "object" && typeof e != "function", k = Array.isArray, oe = (e) => k(e) || typeof e?.[Symbol.iterator] == "function", A = "[ 	\n\f\r]", j = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, M = /-->/g, N = />/g, P = RegExp(`>|${A}(?:([^\\s"'>=/]+)(${A}*=${A}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`, "g"), F = /'/g, I = /"/g, L = /^(?:script|style|textarea|title)$/i, R = ((e) => (t, ...n) => ({
+var b = globalThis, x = (e) => e, S = b.trustedTypes, C = S ? S.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, w = "$lit$", T = `lit$${Math.random().toFixed(9).slice(2)}$`, E = "?" + T, D = `<${E}>`, O = document, k = () => O.createComment(""), A = (e) => e === null || typeof e != "object" && typeof e != "function", j = Array.isArray, ie = (e) => j(e) || typeof e?.[Symbol.iterator] == "function", M = "[ 	\n\f\r]", N = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, P = /-->/g, F = />/g, I = RegExp(`>|${M}(?:([^\\s"'>=/]+)(${M}*=${M}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`, "g"), L = /'/g, R = /"/g, z = /^(?:script|style|textarea|title)$/i, B = ((e) => (t, ...n) => ({
 	_$litType$: e,
 	strings: t,
 	values: n
-}))(1), z = Symbol.for("lit-noChange"), B = Symbol.for("lit-nothing"), V = /* @__PURE__ */ new WeakMap(), H = E.createTreeWalker(E, 129);
-function U(e, t) {
-	if (!k(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
-	return S === void 0 ? t : S.createHTML(t);
+}))(1), V = Symbol.for("lit-noChange"), H = Symbol.for("lit-nothing"), U = /* @__PURE__ */ new WeakMap(), W = O.createTreeWalker(O, 129);
+function G(e, t) {
+	if (!j(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
+	return C === void 0 ? t : C.createHTML(t);
 }
-var se = (e, t) => {
-	let n = e.length - 1, r = [], i, a = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", o = j;
+var ae = (e, t) => {
+	let n = e.length - 1, r = [], i, a = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", o = N;
 	for (let t = 0; t < n; t++) {
 		let n = e[t], s, c, l = -1, u = 0;
-		for (; u < n.length && (o.lastIndex = u, c = o.exec(n), c !== null);) u = o.lastIndex, o === j ? c[1] === "!--" ? o = M : c[1] === void 0 ? c[2] === void 0 ? c[3] !== void 0 && (o = P) : (L.test(c[2]) && (i = RegExp("</" + c[2], "g")), o = P) : o = N : o === P ? c[0] === ">" ? (o = i ?? j, l = -1) : c[1] === void 0 ? l = -2 : (l = o.lastIndex - c[2].length, s = c[1], o = c[3] === void 0 ? P : c[3] === "\"" ? I : F) : o === I || o === F ? o = P : o === M || o === N ? o = j : (o = P, i = void 0);
-		let d = o === P && e[t + 1].startsWith("/>") ? " " : "";
-		a += o === j ? n + ae : l >= 0 ? (r.push(s), n.slice(0, l) + C + n.slice(l) + w + d) : n + w + (l === -2 ? t : d);
+		for (; u < n.length && (o.lastIndex = u, c = o.exec(n), c !== null);) u = o.lastIndex, o === N ? c[1] === "!--" ? o = P : c[1] === void 0 ? c[2] === void 0 ? c[3] !== void 0 && (o = I) : (z.test(c[2]) && (i = RegExp("</" + c[2], "g")), o = I) : o = F : o === I ? c[0] === ">" ? (o = i ?? N, l = -1) : c[1] === void 0 ? l = -2 : (l = o.lastIndex - c[2].length, s = c[1], o = c[3] === void 0 ? I : c[3] === "\"" ? R : L) : o === R || o === L ? o = I : o === P || o === F ? o = N : (o = I, i = void 0);
+		let d = o === I && e[t + 1].startsWith("/>") ? " " : "";
+		a += o === N ? n + D : l >= 0 ? (r.push(s), n.slice(0, l) + w + n.slice(l) + T + d) : n + T + (l === -2 ? t : d);
 	}
-	return [U(e, a + (e[n] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), r];
-}, W = class e {
+	return [G(e, a + (e[n] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), r];
+}, K = class e {
 	constructor({ strings: t, _$litType$: n }, r) {
 		let i;
 		this.parts = [];
-		let a = 0, o = 0, s = t.length - 1, c = this.parts, [l, u] = se(t, n);
-		if (this.el = e.createElement(l, r), H.currentNode = this.el.content, n === 2 || n === 3) {
+		let a = 0, o = 0, s = t.length - 1, c = this.parts, [l, u] = ae(t, n);
+		if (this.el = e.createElement(l, r), W.currentNode = this.el.content, n === 2 || n === 3) {
 			let e = this.el.content.firstChild;
 			e.replaceWith(...e.childNodes);
 		}
-		for (; (i = H.nextNode()) !== null && c.length < s;) {
+		for (; (i = W.nextNode()) !== null && c.length < s;) {
 			if (i.nodeType === 1) {
-				if (i.hasAttributes()) for (let e of i.getAttributeNames()) if (e.endsWith(C)) {
-					let t = u[o++], n = i.getAttribute(e).split(w), r = /([.?@])?(.*)/.exec(t);
+				if (i.hasAttributes()) for (let e of i.getAttributeNames()) if (e.endsWith(w)) {
+					let t = u[o++], n = i.getAttribute(e).split(T), r = /([.?@])?(.*)/.exec(t);
 					c.push({
 						type: 1,
 						index: a,
 						name: r[2],
 						strings: n,
-						ctor: r[1] === "." ? ce : r[1] === "?" ? le : r[1] === "@" ? ue : J
+						ctor: r[1] === "." ? se : r[1] === "?" ? ce : r[1] === "@" ? le : Y
 					}), i.removeAttribute(e);
-				} else e.startsWith(w) && (c.push({
+				} else e.startsWith(T) && (c.push({
 					type: 6,
 					index: a
 				}), i.removeAttribute(e));
-				if (L.test(i.tagName)) {
-					let e = i.textContent.split(w), t = e.length - 1;
+				if (z.test(i.tagName)) {
+					let e = i.textContent.split(T), t = e.length - 1;
 					if (t > 0) {
-						i.textContent = x ? x.emptyScript : "";
-						for (let n = 0; n < t; n++) i.append(e[n], D()), H.nextNode(), c.push({
+						i.textContent = S ? S.emptyScript : "";
+						for (let n = 0; n < t; n++) i.append(e[n], k()), W.nextNode(), c.push({
 							type: 2,
 							index: ++a
 						});
-						i.append(e[t], D());
+						i.append(e[t], k());
 					}
 				}
 			} else if (i.nodeType === 8) {
-				if (i.data === T) c.push({
+				if (i.data === E) c.push({
 					type: 2,
 					index: a
 				});
 				else {
 					let e = -1;
-					for (; (e = i.data.indexOf(w, e + 1)) !== -1;) c.push({
+					for (; (e = i.data.indexOf(T, e + 1)) !== -1;) c.push({
 						type: 7,
 						index: a
-					}), e += w.length - 1;
+					}), e += T.length - 1;
 				}
 			}
 			a++;
 		}
 	}
 	static createElement(e, t) {
-		let n = E.createElement("template");
+		let n = O.createElement("template");
 		return n.innerHTML = e, n;
 	}
 };
-function G(e, t, n = e, r) {
-	if (t === z) return t;
-	let i = r === void 0 ? n._$Cl : n._$Co?.[r], a = O(t) ? void 0 : t._$litDirective$;
-	return i?.constructor !== a && (i?._$AO?.(!1), a === void 0 ? i = void 0 : (i = new a(e), i._$AT(e, n, r)), r === void 0 ? n._$Cl = i : (n._$Co ??= [])[r] = i), i !== void 0 && (t = G(e, i._$AS(e, t.values), i, r)), t;
+function q(e, t, n = e, r) {
+	if (t === V) return t;
+	let i = r === void 0 ? n._$Cl : n._$Co?.[r], a = A(t) ? void 0 : t._$litDirective$;
+	return i?.constructor !== a && (i?._$AO?.(!1), a === void 0 ? i = void 0 : (i = new a(e), i._$AT(e, n, r)), r === void 0 ? n._$Cl = i : (n._$Co ??= [])[r] = i), i !== void 0 && (t = q(e, i._$AS(e, t.values), i, r)), t;
 }
-var K = class {
+var oe = class {
 	constructor(e, t) {
 		this._$AV = [], this._$AN = void 0, this._$AD = e, this._$AM = t;
 	}
@@ -344,28 +344,28 @@ var K = class {
 		return this._$AM._$AU;
 	}
 	u(e) {
-		let { el: { content: t }, parts: n } = this._$AD, r = (e?.creationScope ?? E).importNode(t, !0);
-		H.currentNode = r;
-		let i = H.nextNode(), a = 0, o = 0, s = n[0];
+		let { el: { content: t }, parts: n } = this._$AD, r = (e?.creationScope ?? O).importNode(t, !0);
+		W.currentNode = r;
+		let i = W.nextNode(), a = 0, o = 0, s = n[0];
 		for (; s !== void 0;) {
 			if (a === s.index) {
 				let t;
-				s.type === 2 ? t = new q(i, i.nextSibling, this, e) : s.type === 1 ? t = new s.ctor(i, s.name, s.strings, this, e) : s.type === 6 && (t = new de(i, this, e)), this._$AV.push(t), s = n[++o];
+				s.type === 2 ? t = new J(i, i.nextSibling, this, e) : s.type === 1 ? t = new s.ctor(i, s.name, s.strings, this, e) : s.type === 6 && (t = new ue(i, this, e)), this._$AV.push(t), s = n[++o];
 			}
-			a !== s?.index && (i = H.nextNode(), a++);
+			a !== s?.index && (i = W.nextNode(), a++);
 		}
-		return H.currentNode = E, r;
+		return W.currentNode = O, r;
 	}
 	p(e) {
 		let t = 0;
 		for (let n of this._$AV) n !== void 0 && (n.strings === void 0 ? n._$AI(e[t]) : (n._$AI(e, n, t), t += n.strings.length - 2)), t++;
 	}
-}, q = class e {
+}, J = class e {
 	get _$AU() {
 		return this._$AM?._$AU ?? this._$Cv;
 	}
 	constructor(e, t, n, r) {
-		this.type = 2, this._$AH = B, this._$AN = void 0, this._$AA = e, this._$AB = t, this._$AM = n, this.options = r, this._$Cv = r?.isConnected ?? !0;
+		this.type = 2, this._$AH = H, this._$AN = void 0, this._$AA = e, this._$AB = t, this._$AM = n, this.options = r, this._$Cv = r?.isConnected ?? !0;
 	}
 	get parentNode() {
 		let e = this._$AA.parentNode, t = this._$AM;
@@ -378,7 +378,7 @@ var K = class {
 		return this._$AB;
 	}
 	_$AI(e, t = this) {
-		e = G(this, e, t), O(e) ? e === B || e == null || e === "" ? (this._$AH !== B && this._$AR(), this._$AH = B) : e !== this._$AH && e !== z && this._(e) : e._$litType$ === void 0 ? e.nodeType === void 0 ? oe(e) ? this.k(e) : this._(e) : this.T(e) : this.$(e);
+		e = q(this, e, t), A(e) ? e === H || e == null || e === "" ? (this._$AH !== H && this._$AR(), this._$AH = H) : e !== this._$AH && e !== V && this._(e) : e._$litType$ === void 0 ? e.nodeType === void 0 ? ie(e) ? this.k(e) : this._(e) : this.T(e) : this.$(e);
 	}
 	O(e) {
 		return this._$AA.parentNode.insertBefore(e, this._$AB);
@@ -387,36 +387,36 @@ var K = class {
 		this._$AH !== e && (this._$AR(), this._$AH = this.O(e));
 	}
 	_(e) {
-		this._$AH !== B && O(this._$AH) ? this._$AA.nextSibling.data = e : this.T(E.createTextNode(e)), this._$AH = e;
+		this._$AH !== H && A(this._$AH) ? this._$AA.nextSibling.data = e : this.T(O.createTextNode(e)), this._$AH = e;
 	}
 	$(e) {
-		let { values: t, _$litType$: n } = e, r = typeof n == "number" ? this._$AC(e) : (n.el === void 0 && (n.el = W.createElement(U(n.h, n.h[0]), this.options)), n);
+		let { values: t, _$litType$: n } = e, r = typeof n == "number" ? this._$AC(e) : (n.el === void 0 && (n.el = K.createElement(G(n.h, n.h[0]), this.options)), n);
 		if (this._$AH?._$AD === r) this._$AH.p(t);
 		else {
-			let e = new K(r, this), n = e.u(this.options);
+			let e = new oe(r, this), n = e.u(this.options);
 			e.p(t), this.T(n), this._$AH = e;
 		}
 	}
 	_$AC(e) {
-		let t = V.get(e.strings);
-		return t === void 0 && V.set(e.strings, t = new W(e)), t;
+		let t = U.get(e.strings);
+		return t === void 0 && U.set(e.strings, t = new K(e)), t;
 	}
 	k(t) {
-		k(this._$AH) || (this._$AH = [], this._$AR());
+		j(this._$AH) || (this._$AH = [], this._$AR());
 		let n = this._$AH, r, i = 0;
-		for (let a of t) i === n.length ? n.push(r = new e(this.O(D()), this.O(D()), this, this.options)) : r = n[i], r._$AI(a), i++;
+		for (let a of t) i === n.length ? n.push(r = new e(this.O(k()), this.O(k()), this, this.options)) : r = n[i], r._$AI(a), i++;
 		i < n.length && (this._$AR(r && r._$AB.nextSibling, i), n.length = i);
 	}
 	_$AR(e = this._$AA.nextSibling, t) {
 		for (this._$AP?.(!1, !0, t); e !== this._$AB;) {
-			let t = b(e).nextSibling;
-			b(e).remove(), e = t;
+			let t = x(e).nextSibling;
+			x(e).remove(), e = t;
 		}
 	}
 	setConnected(e) {
 		this._$AM === void 0 && (this._$Cv = e, this._$AP?.(e));
 	}
-}, J = class {
+}, Y = class {
 	get tagName() {
 		return this.element.tagName;
 	}
@@ -424,47 +424,47 @@ var K = class {
 		return this._$AM._$AU;
 	}
 	constructor(e, t, n, r, i) {
-		this.type = 1, this._$AH = B, this._$AN = void 0, this.element = e, this.name = t, this._$AM = r, this.options = i, n.length > 2 || n[0] !== "" || n[1] !== "" ? (this._$AH = Array(n.length - 1).fill(/* @__PURE__ */ new String()), this.strings = n) : this._$AH = B;
+		this.type = 1, this._$AH = H, this._$AN = void 0, this.element = e, this.name = t, this._$AM = r, this.options = i, n.length > 2 || n[0] !== "" || n[1] !== "" ? (this._$AH = Array(n.length - 1).fill(/* @__PURE__ */ new String()), this.strings = n) : this._$AH = H;
 	}
 	_$AI(e, t = this, n, r) {
 		let i = this.strings, a = !1;
-		if (i === void 0) e = G(this, e, t, 0), a = !O(e) || e !== this._$AH && e !== z, a && (this._$AH = e);
+		if (i === void 0) e = q(this, e, t, 0), a = !A(e) || e !== this._$AH && e !== V, a && (this._$AH = e);
 		else {
 			let r = e, o, s;
-			for (e = i[0], o = 0; o < i.length - 1; o++) s = G(this, r[n + o], t, o), s === z && (s = this._$AH[o]), a ||= !O(s) || s !== this._$AH[o], s === B ? e = B : e !== B && (e += (s ?? "") + i[o + 1]), this._$AH[o] = s;
+			for (e = i[0], o = 0; o < i.length - 1; o++) s = q(this, r[n + o], t, o), s === V && (s = this._$AH[o]), a ||= !A(s) || s !== this._$AH[o], s === H ? e = H : e !== H && (e += (s ?? "") + i[o + 1]), this._$AH[o] = s;
 		}
 		a && !r && this.j(e);
 	}
 	j(e) {
-		e === B ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
+		e === H ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
 	}
-}, ce = class extends J {
+}, se = class extends Y {
 	constructor() {
 		super(...arguments), this.type = 3;
 	}
 	j(e) {
-		this.element[this.name] = e === B ? void 0 : e;
+		this.element[this.name] = e === H ? void 0 : e;
 	}
-}, le = class extends J {
+}, ce = class extends Y {
 	constructor() {
 		super(...arguments), this.type = 4;
 	}
 	j(e) {
-		this.element.toggleAttribute(this.name, !!e && e !== B);
+		this.element.toggleAttribute(this.name, !!e && e !== H);
 	}
-}, ue = class extends J {
+}, le = class extends Y {
 	constructor(e, t, n, r, i) {
 		super(e, t, n, r, i), this.type = 5;
 	}
 	_$AI(e, t = this) {
-		if ((e = G(this, e, t, 0) ?? B) === z) return;
-		let n = this._$AH, r = e === B && n !== B || e.capture !== n.capture || e.once !== n.once || e.passive !== n.passive, i = e !== B && (n === B || r);
+		if ((e = q(this, e, t, 0) ?? H) === V) return;
+		let n = this._$AH, r = e === H && n !== H || e.capture !== n.capture || e.once !== n.once || e.passive !== n.passive, i = e !== H && (n === H || r);
 		r && this.element.removeEventListener(this.name, this, n), i && this.element.addEventListener(this.name, this, e), this._$AH = e;
 	}
 	handleEvent(e) {
 		typeof this._$AH == "function" ? this._$AH.call(this.options?.host ?? this.element, e) : this._$AH.handleEvent(e);
 	}
-}, de = class {
+}, ue = class {
 	constructor(e, t, n) {
 		this.element = e, this.type = 6, this._$AN = void 0, this._$AM = t, this.options = n;
 	}
@@ -472,18 +472,18 @@ var K = class {
 		return this._$AM._$AU;
 	}
 	_$AI(e) {
-		G(this, e);
+		q(this, e);
 	}
-}, fe = y.litHtmlPolyfillSupport;
-fe?.(W, q), (y.litHtmlVersions ??= []).push("3.3.3");
-var pe = (e, t, n) => {
+}, de = b.litHtmlPolyfillSupport;
+de?.(K, J), (b.litHtmlVersions ??= []).push("3.3.3");
+var fe = (e, t, n) => {
 	let r = n?.renderBefore ?? t, i = r._$litPart$;
 	if (i === void 0) {
 		let e = n?.renderBefore ?? null;
-		r._$litPart$ = i = new q(t.insertBefore(D(), e), e, void 0, n ?? {});
+		r._$litPart$ = i = new J(t.insertBefore(k(), e), e, void 0, n ?? {});
 	}
 	return i._$AI(e), i;
-}, Y = globalThis, X = class extends v {
+}, X = globalThis, Z = class extends y {
 	constructor() {
 		super(...arguments), this.renderOptions = { host: this }, this._$Do = void 0;
 	}
@@ -493,7 +493,7 @@ var pe = (e, t, n) => {
 	}
 	update(e) {
 		let t = this.render();
-		this.hasUpdated || (this.renderOptions.isConnected = this.isConnected), super.update(e), this._$Do = pe(t, this.renderRoot, this.renderOptions);
+		this.hasUpdated || (this.renderOptions.isConnected = this.isConnected), super.update(e), this._$Do = fe(t, this.renderRoot, this.renderOptions);
 	}
 	connectedCallback() {
 		super.connectedCallback(), this._$Do?.setConnected(!0);
@@ -502,15 +502,15 @@ var pe = (e, t, n) => {
 		super.disconnectedCallback(), this._$Do?.setConnected(!1);
 	}
 	render() {
-		return z;
+		return V;
 	}
 };
-X._$litElement$ = !0, X.finalized = !0, Y.litElementHydrateSupport?.({ LitElement: X });
-var me = Y.litElementPolyfillSupport;
-me?.({ LitElement: X }), (Y.litElementVersions ??= []).push("4.2.2");
+Z._$litElement$ = !0, Z.finalized = !0, X.litElementHydrateSupport?.({ LitElement: Z });
+var pe = X.litElementPolyfillSupport;
+pe?.({ LitElement: Z }), (X.litElementVersions ??= []).push("4.2.2");
 //#endregion
 //#region src/translations.ts
-var he = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PURIFIER.AUTO_ACCESSORY.CAMERA.CHRISTMAS_TREE.COFFEE_MAKER.CONTACT_SENSOR.DOOR.DOORBELL.EXTERIOR_BLIND.FAN.GAME_CONSOLE.GARAGE_DOOR.HEADPHONES.HUB.INTERIOR_BLIND.LAPTOP.LIGHT.MICROWAVE.MOBILE_PHONE.MOTION_SENSOR.MUSIC_SYSTEM.NETWORK_HARDWARE.OTHER.OVEN.PHONE.PRINTER.ROUTER.SCENE_TRIGGER.SCREEN.SECURITY_PANEL.SMARTLOCK.SMARTPLUG.SPEAKER.STREAMING_DEVICE.SWITCH.TABLET.TEMPERATURE_SENSOR.THERMOSTAT.TV.VACUUM_CLEANER.WATER_HEATER.WEARABLE".split("."), ge = {
+var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PURIFIER.AUTO_ACCESSORY.CAMERA.CHRISTMAS_TREE.COFFEE_MAKER.CONTACT_SENSOR.DOOR.DOORBELL.EXTERIOR_BLIND.FAN.GAME_CONSOLE.GARAGE_DOOR.HEADPHONES.HUB.INTERIOR_BLIND.LAPTOP.LIGHT.MICROWAVE.MOBILE_PHONE.MOTION_SENSOR.MUSIC_SYSTEM.NETWORK_HARDWARE.OTHER.OVEN.PHONE.PRINTER.ROUTER.SCENE_TRIGGER.SCREEN.SECURITY_PANEL.SMARTLOCK.SMARTPLUG.SPEAKER.STREAMING_DEVICE.SWITCH.TABLET.TEMPERATURE_SENSOR.THERMOSTAT.TV.VACUUM_CLEANER.WATER_HEATER.WEARABLE".split("."), he = {
 	appTitle: "Alexa Exposure Manager",
 	loading: "Loading Alexa exposure configuration...",
 	loadErrorTitle: "Alexa exposure data could not be loaded",
@@ -649,17 +649,13 @@ var he = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	validationIssue: "{entity}: {message}",
 	readOnlyTitle: "Editing is disabled",
 	readOnlyBody: "The managed YAML contains values this panel cannot safely preserve. Resolve these issues in YAML, restart Home Assistant, and reload the panel."
-}, Z;
-function _e(e) {
-	Z = e;
-}
+};
 function Q(e, t = {}) {
-	let n = `component.alexa_exposure_manager.panel.${e}`, r = Z?.(n, t), i = r && r !== n ? r : ge[e];
-	return Object.entries(t).reduce((e, [t, n]) => e.replaceAll(`{${t}}`, String(n)), i);
+	return Object.entries(t).reduce((e, [t, n]) => e.replaceAll(`{${t}}`, String(n)), he[e]);
 }
 //#endregion
 //#region src/alexa-exposure-manager-panel.ts
-var $ = class e extends X {
+var $ = class e extends Z {
 	static properties = {
 		hass: { attribute: !1 },
 		narrow: { type: Boolean },
@@ -728,24 +724,24 @@ var $ = class e extends X {
 		}
 	}
 	render() {
-		return _e(this.hass?.localize ? (e, t) => this.hass.localize(e, t) : void 0), R`
+		return B`
       <main class=${this.narrow ? "narrow" : ""}>
-        ${this.loading ? R`<section class="state" role="status"><div class="spinner"></div>${Q("loading")}</section>` : B}
-        ${!this.loading && this.error ? R`<section class="state error" role="alert">
+        ${this.loading ? B`<section class="state" role="status"><div class="spinner"></div>${Q("loading")}</section>` : H}
+        ${!this.loading && this.error ? B`<section class="state error" role="alert">
               <h1>${Q("loadErrorTitle")}</h1>
               <p>${this.error}</p>
               <button type="button" @click=${this.load}>${Q("retry")}</button>
-            </section>` : B}
-        ${!this.loading && !this.error && !this.isConfigured() ? this.renderSetup() : B}
-        ${!this.loading && !this.error && this.isConfigured() && this.entityCount === 0 ? R`<section class="state">
+            </section>` : H}
+        ${!this.loading && !this.error && !this.isConfigured() ? this.renderSetup() : H}
+        ${!this.loading && !this.error && this.isConfigured() && this.entityCount === 0 ? B`<section class="state">
               <h1>${Q("emptyTitle")}</h1>
               <p>${Q("emptyBody")}</p>
-            </section>` : B}
-        ${!this.loading && !this.error && this.isConfigured() && this.entityCount > 0 ? this.renderManager() : B}
-        ${this.addDialogOpen ? this.renderAddDialog() : B}
-        ${this.bulkConfirmOpen ? this.renderBulkConfirmation() : B}
-        ${this.metadataEntityId && this.metadataDraft ? this.renderMetadataDialog() : B}
-        ${this.confirmation ? this.renderOperationConfirmation() : B}
+            </section>` : H}
+        ${!this.loading && !this.error && this.isConfigured() && this.entityCount > 0 ? this.renderManager() : H}
+        ${this.addDialogOpen ? this.renderAddDialog() : H}
+        ${this.bulkConfirmOpen ? this.renderBulkConfirmation() : H}
+        ${this.metadataEntityId && this.metadataDraft ? this.renderMetadataDialog() : H}
+        ${this.confirmation ? this.renderOperationConfirmation() : H}
       </main>
     `;
 	}
@@ -756,7 +752,7 @@ var $ = class e extends X {
 		return Array.isArray(this.entitiesResponse?.entities) ? this.entitiesResponse.entities.length : 0;
 	}
 	renderSetup() {
-		return R`
+		return B`
       <section class="setup">
         <span class="eyebrow">${Q("setupEyebrow")}</span>
         <h1>${Q("setupTitle")}</h1>
@@ -769,12 +765,12 @@ var $ = class e extends X {
         <div class="migration">
           <p>${Q("migrationBody")}</p>
           <button type="button" aria-label=${Q("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${Q("migrationPreview")}</button>
-          ${this.migrationPreviewResponse ? R`<div class="migration-result" role="status">
+          ${this.migrationPreviewResponse ? B`<div class="migration-result" role="status">
                 <span>${this.migrationSummary()}</span>
-                ${typeof this.migrationPreviewResponse.token == "string" ? R`<button class="secondary" type="button" aria-label=${Q("migrationImport")} @click=${() => {
+                ${typeof this.migrationPreviewResponse.token == "string" ? B`<button class="secondary" type="button" aria-label=${Q("migrationImport")} @click=${() => {
 			this.confirmation = "migration";
-		}}>${Q("migrationImport")}</button>` : B}
-              </div>` : B}
+		}}>${Q("migrationImport")}</button>` : H}
+              </div>` : H}
         </div>
       </section>
     `;
@@ -789,7 +785,7 @@ var $ = class e extends X {
 			].join(" ").toLocaleLowerCase().includes(t), i = this.visibility === "all" || this.visibility === "exposed" && n || this.visibility === "hidden" && !n || this.visibility === "unsupported" && !e.supported || this.visibility === "missing" && e.missing;
 			return r && i;
 		});
-		return R`
+		return B`
       <div class="manager">
         <header class="page-header">
           <div>
@@ -798,7 +794,7 @@ var $ = class e extends X {
             <p>${Q("entitiesBody")}</p>
           </div>
           <div class="save-group">
-            ${this.pendingCount ? R`<span class="pending" role="status">${this.pendingCount === 1 ? Q("pendingOne") : Q("pendingMany", { count: this.pendingCount })}</span>` : B}
+            ${this.pendingCount ? B`<span class="pending" role="status">${this.pendingCount === 1 ? Q("pendingOne") : Q("pendingMany", { count: this.pendingCount })}</span>` : H}
             <button
               type="button"
               aria-label=${Q("save")}
@@ -808,13 +804,13 @@ var $ = class e extends X {
           </div>
         </header>
 
-        ${this.status?.restart_required ? this.renderRestartBanner() : B}
-        ${this.editingEnabled ? B : R`<section class="message error" role="alert"><strong>${Q("readOnlyTitle")}</strong><span>${Q("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}</span></section>`}
-        ${this.saveError ? R`<section class="message error" role="alert"><strong>${Q("saveErrorTitle")}</strong><span>${this.saveError}</span></section>` : B}
-        ${this.validationIssues.length ? R`<section class="message error validation" role="alert"><strong>${Q("validationTitle")}</strong><ul>${this.validationIssues.map((e) => R`<li>${Q("validationIssue", {
+        ${this.status?.restart_required ? this.renderRestartBanner() : H}
+        ${this.editingEnabled ? H : B`<section class="message error" role="alert"><strong>${Q("readOnlyTitle")}</strong><span>${Q("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}</span></section>`}
+        ${this.saveError ? B`<section class="message error" role="alert"><strong>${Q("saveErrorTitle")}</strong><span>${this.saveError}</span></section>` : H}
+        ${this.validationIssues.length ? B`<section class="message error validation" role="alert"><strong>${Q("validationTitle")}</strong><ul>${this.validationIssues.map((e) => B`<li>${Q("validationIssue", {
 			entity: e.entity_id ?? e.field ?? Q("entitiesTitle"),
 			message: e.message
-		})}</li>`)}</ul></section>` : B}
+		})}</li>`)}</ul></section>` : H}
 
         <section class="workspace">
           <div class="toolbar">
@@ -862,15 +858,15 @@ var $ = class e extends X {
               </button>
             </div>
           </div>
-          ${this.selectedEntities.length ? R`<div class="bulk-bar">
+          ${this.selectedEntities.length ? B`<div class="bulk-bar">
                 <strong>${Q("selectedCount", { count: this.selectedEntities.length })}</strong>
                 <button class="secondary" type="button" aria-label=${Q("exposeSelectedBulk")} ?disabled=${!this.editingEnabled} @click=${() => this.openBulkConfirm("expose")}>${Q("exposeSelectedBulk")}</button>
                 <button class="danger-secondary" type="button" aria-label=${Q("unexposeSelected")} ?disabled=${!this.editingEnabled} @click=${() => this.openBulkConfirm("unexpose")}>${Q("unexposeSelected")}</button>
                 <button class="text-button" type="button" @click=${() => {
 			this.selectedEntities = [];
 		}}>${Q("clearSelection")}</button>
-              </div>` : B}
-          ${n.length ? R`
+              </div>` : H}
+          ${n.length ? B`
                 <div class="entity-table" role="table">
                   <div class="table-head" role="row">
                     <span role="columnheader"></span>
@@ -882,7 +878,7 @@ var $ = class e extends X {
                   </div>
                   ${n.map((e) => this.renderEntity(e))}
                 </div>
-              ` : R`<div class="empty"><strong>${Q("filteredEmptyTitle")}</strong><span>${Q("filteredEmptyBody")}</span></div>`}
+              ` : B`<div class="empty"><strong>${Q("filteredEmptyTitle")}</strong><span>${Q("filteredEmptyBody")}</span></div>`}
         </section>
         ${this.renderAdvanced()}
       </div>
@@ -890,7 +886,7 @@ var $ = class e extends X {
 	}
 	renderEntity(e) {
 		let t = this.staged[e.entityId]?.exposed ?? e.exposed, n = Q(t ? "hideEntity" : "exposeEntity", { name: e.name });
-		return R`
+		return B`
       <div class=${`entity-row${e.supported ? "" : " unsupported"}${e.missing ? " missing" : ""}`} role="row">
         <div role="cell">
           <input
@@ -913,7 +909,7 @@ var $ = class e extends X {
           <span class=${e.missing || !e.supported ? "warning" : "ok"}>
             ${e.missing ? Q("missing") : e.supported ? Q("available") : Q("unsupported")}
           </span>
-          ${!e.supported && e.unsupportedReason ? R`<small>${e.unsupportedReason}</small>` : B}
+          ${!e.supported && e.unsupportedReason ? B`<small>${e.unsupportedReason}</small>` : H}
         </div>
         <div class="exposure" role="cell">
           <span class=${t ? "exposed" : "hidden"}>${Q(t ? "exposed" : "hidden")}</span>
@@ -928,7 +924,7 @@ var $ = class e extends X {
           ><span></span></button>
         </div>
         <div role="cell" class="row-actions">
-          ${e.missing ? R`<button class="icon" type="button" aria-label=${Q("removeMissing", { name: e.name })} ?disabled=${!this.editingEnabled} @click=${() => this.stageRemove(e)}><ha-icon icon="mdi:delete-outline"></ha-icon></button>` : R`<button class="icon" type="button" aria-label=${Q("editMetadata", { name: e.name })} ?disabled=${!this.editingEnabled} @click=${(t) => this.openMetadataDialog(e, t)}><ha-icon icon="mdi:pencil"></ha-icon></button>`}
+          ${e.missing ? B`<button class="icon" type="button" aria-label=${Q("removeMissing", { name: e.name })} ?disabled=${!this.editingEnabled} @click=${() => this.stageRemove(e)}><ha-icon icon="mdi:delete-outline"></ha-icon></button>` : B`<button class="icon" type="button" aria-label=${Q("editMetadata", { name: e.name })} ?disabled=${!this.editingEnabled} @click=${(t) => this.openMetadataDialog(e, t)}><ha-icon icon="mdi:pencil"></ha-icon></button>`}
         </div>
       </div>
     `;
@@ -997,7 +993,7 @@ var $ = class e extends X {
 		}
 	}
 	renderRestartBanner() {
-		return this.restartBannerDismissed ? B : R`
+		return this.restartBannerDismissed ? H : B`
       <section class="restart" role="status">
         <ha-icon icon="mdi:restart-alert"></ha-icon>
         <div><strong>${Q("restartTitle")}</strong><span>${Q("restartBody")} ${Q("discoveryBody")}</span></div>
@@ -1062,7 +1058,7 @@ var $ = class e extends X {
 			].join(" ").toLocaleLowerCase().includes(t);
 			return !n && e.supported && !e.missing && r;
 		}), r = e.CANDIDATE_WINDOW, i = Math.min(this.candidateWindowStart, Math.max(0, n.length - r)), a = n.slice(i, i + r);
-		return R`
+		return B`
       <div class="dialog-backdrop" @mousedown=${(e) => {
 			e.target === e.currentTarget && this.closeAddDialog();
 		}}>
@@ -1084,8 +1080,8 @@ var $ = class e extends X {
             />
           </label>
           <div class="candidate-list" @scroll=${(e) => this.onCandidateScroll(e, n.length)}>
-            ${i > 0 ? R`<div class="virtual-spacer" style=${`height:${i * 56}px`}></div>` : B}
-            ${a.length ? a.map((e) => R`
+            ${i > 0 ? B`<div class="virtual-spacer" style=${`height:${i * 56}px`}></div>` : H}
+            ${a.length ? a.map((e) => B`
                   <label class="candidate-row">
                     <input
                       type="checkbox"
@@ -1096,8 +1092,8 @@ var $ = class e extends X {
                     <span><strong>${e.name}</strong><code>${e.entityId}</code></span>
                     <small>${e.deviceName || Q("noDevice")} · ${e.areaName || Q("noArea")}</small>
                   </label>
-                `) : R`<div class="empty compact"><strong>${Q("noCandidatesTitle")}</strong><span>${Q("noCandidatesBody")}</span></div>`}
-            ${i + a.length < n.length ? R`<div class="virtual-spacer" style=${`height:${(n.length - i - a.length) * 56}px`}></div>` : B}
+                `) : B`<div class="empty compact"><strong>${Q("noCandidatesTitle")}</strong><span>${Q("noCandidatesBody")}</span></div>`}
+            ${i + a.length < n.length ? B`<div class="virtual-spacer" style=${`height:${(n.length - i - a.length) * 56}px`}></div>` : H}
           </div>
           <footer>
             <span>${Q("candidateCount", {
@@ -1148,7 +1144,7 @@ var $ = class e extends X {
 	}
 	renderBulkConfirmation() {
 		let e = this.bulkAction === "expose", t = Q(e ? "bulkExposeConfirmTitle" : "bulkUnexposeConfirmTitle", { count: this.selectedEntities.length }), n = Q(e ? "bulkExposeConfirmBody" : "bulkUnexposeConfirmBody"), r = Q(e ? "confirmExpose" : "confirmUnexpose");
-		return R`
+		return B`
       <div class="dialog-backdrop">
         <section class="dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="bulk-confirm-title" @keydown=${(e) => {
 			e.key === "Escape" && (this.bulkConfirmOpen = !1);
@@ -1189,7 +1185,7 @@ var $ = class e extends X {
 	}
 	renderMetadataDialog() {
 		let e = this.normalizedEntities.find((e) => e.entityId === this.metadataEntityId), t = this.metadataDraft;
-		return !e || !t ? B : R`
+		return !e || !t ? H : B`
       <div class="dialog-backdrop">
         <section class="dialog metadata-dialog" role="dialog" aria-modal="true" aria-labelledby="metadata-dialog-title" @keydown=${(e) => {
 			e.key === "Escape" && this.closeMetadataDialog();
@@ -1230,7 +1226,7 @@ var $ = class e extends X {
 		}}
                 >
                   <option value="">${Q("noDisplayCategory")}</option>
-                  ${he.map((e) => R`<option value=${e}>${e}</option>`)}
+                  ${me.map((e) => B`<option value=${e}>${e}</option>`)}
                 </select>
               </label>
             </fieldset>
@@ -1260,17 +1256,17 @@ var $ = class e extends X {
 		return e && typeof e == "object" && "code" in e ? String(e.code) : "";
 	}
 	renderAdvanced() {
-		return R`
+		return B`
       <section class="advanced">
         <button class="advanced-toggle" type="button" aria-label=${Q("advancedTools")} aria-expanded=${String(this.advancedOpen)} @click=${this.toggleAdvanced}>
           <span><strong>${Q("advancedTools")}</strong><small>${Q("advancedBody")}</small></span>
           <ha-icon icon=${this.advancedOpen ? "mdi:chevron-up" : "mdi:chevron-down"}></ha-icon>
         </button>
-        ${this.advancedOpen ? R`<div class="advanced-content">
-              ${this.advancedLoading ? R`<div class="advanced-state" role="status">${Q("advancedLoading")}</div>` : B}
-              ${this.advancedError ? R`<div class="message error" role="alert">${this.advancedError}</div>` : B}
-              ${this.advancedLoading ? B : this.renderAdvancedGrid()}
-            </div>` : B}
+        ${this.advancedOpen ? B`<div class="advanced-content">
+              ${this.advancedLoading ? B`<div class="advanced-state" role="status">${Q("advancedLoading")}</div>` : H}
+              ${this.advancedError ? B`<div class="message error" role="alert">${this.advancedError}</div>` : H}
+              ${this.advancedLoading ? H : this.renderAdvancedGrid()}
+            </div>` : H}
       </section>
     `;
 	}
@@ -1292,7 +1288,7 @@ var $ = class e extends X {
 	}
 	renderAdvancedGrid() {
 		let e = String(this.previewResponse?.filter_yaml ?? this.previewResponse?.filter ?? ""), t = String(this.previewResponse?.entity_config_yaml ?? this.previewResponse?.entity_config ?? ""), n = (Array.isArray(this.backupsResponse?.backups) ? this.backupsResponse.backups : []).filter((e) => !!(e && typeof e == "object"));
-		return R`
+		return B`
       <div class="advanced-grid">
         <section class="advanced-card yaml-card">
           <h3>${Q("yamlPreview")}</h3>
@@ -1304,10 +1300,10 @@ var $ = class e extends X {
           <div class="backup-list">
             ${n.length ? n.map((e) => {
 			let t = String(e.id ?? e.backup_id ?? "");
-			return R`<div><span><strong>${t}</strong><small>${String(e.created_at ?? e.created ?? e.timestamp ?? "")} · ${String(e.revision ?? "")}</small></span><button class="secondary" type="button" aria-label=${Q("restoreBackup", { id: t })} @click=${() => {
+			return B`<div><span><strong>${t}</strong><small>${String(e.created_at ?? e.created ?? e.timestamp ?? "")} · ${String(e.revision ?? "")}</small></span><button class="secondary" type="button" aria-label=${Q("restoreBackup", { id: t })} @click=${() => {
 				this.confirmationTarget = t, this.confirmation = "restore";
 			}}>${Q("restoreBackup", { id: t })}</button></div>`;
-		}) : R`<span class="muted">${Q("noBackups")}</span>`}
+		}) : B`<span class="muted">${Q("noBackups")}</span>`}
           </div>
         </section>
         <section class="advanced-card">
@@ -1319,8 +1315,8 @@ var $ = class e extends X {
           <div class="card-actions"><button class="secondary" type="button" aria-label=${Q("runDiagnostics")} @click=${this.runDiagnostics}>${Q("runDiagnostics")}</button><button class="secondary" type="button" aria-label=${Q("supportExport")} @click=${() => {
 			this.confirmation = "support";
 		}}>${Q("supportExport")}</button></div>
-          ${this.diagnosticsResponse ? R`<pre class="diagnostics"><code>${JSON.stringify(this.diagnosticsResponse, null, 2)}</code></pre>` : B}
-          ${this.operationMessage ? R`<p class="operation-message" role="status">${this.operationMessage}</p>` : B}
+          ${this.diagnosticsResponse ? B`<pre class="diagnostics"><code>${JSON.stringify(this.diagnosticsResponse, null, 2)}</code></pre>` : H}
+          ${this.operationMessage ? B`<p class="operation-message" role="status">${this.operationMessage}</p>` : H}
         </section>
       </div>
     `;
@@ -1334,7 +1330,7 @@ var $ = class e extends X {
 	}
 	renderOperationConfirmation() {
 		let e = this.confirmation, t = e === "restore" ? Q("restoreTitle", { id: this.confirmationTarget ?? "" }) : Q(e === "support" ? "supportWarningTitle" : e === "restart" ? "restartConfirmTitle" : "migrationConfirmTitle"), n = Q(e === "restore" ? "restoreBody" : e === "support" ? "supportWarningBody" : e === "restart" ? "restartConfirmBody" : "migrationConfirmBody"), r = Q(e === "restore" ? "confirmRestore" : e === "support" ? "confirmSupportExport" : e === "restart" ? "confirmRestart" : "confirmMigration");
-		return R`
+		return B`
       <div class="dialog-backdrop">
         <section class="dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="operation-confirm-title" @keydown=${(e) => {
 			e.key === "Escape" && this.closeOperationConfirmation();

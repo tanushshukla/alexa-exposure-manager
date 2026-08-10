@@ -5,7 +5,10 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
-- No changes yet.
+- Multi-category `display_categories` values in the managed YAML now switch the
+  manager to read-only instead of being silently truncated.
+- The panel ships its English strings compiled into the custom panel; Home
+  Assistant has no translation category for custom panel UI.
 
 ## [0.1.0] - Unreleased release candidate
 
