@@ -36,9 +36,6 @@ class AlexaExposureManagerRuntime:
             hass.config.config_dir,
             hass.async_add_executor_job,
             lambda: compatibility.async_validate_full_config(hass),
-            display_category_lists=(
-                compatibility.alexa_display_category_lists_supported()
-            ),
             valid_display_categories=compatibility.alexa_display_categories(),
         )
         self._store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
@@ -46,6 +43,7 @@ class AlexaExposureManagerRuntime:
             "restart_required": False,
             "restart_revisions": None,
             "migration_state": "not_started",
+            "last_validation": None,
         }
         self._migration_previews: dict[str, dict[str, Any]] = {}
         self.created_files: dict[str, bool] = {}
@@ -91,8 +89,13 @@ class AlexaExposureManagerRuntime:
             "entities_revision": snapshot["entities_revision"],
             "expose_new_entities": snapshot["expose_new_entities"],
             "restart_required": bool(self._state["restart_required"]),
-            "last_validation": self.transaction.last_validation,
+            "last_validation": (
+                self.transaction.last_validation
+                if self.transaction.last_validation is not None
+                else self._state.get("last_validation")
+            ),
             "migration_state": self._state["migration_state"],
+            "display_categories": sorted(compatibility.alexa_display_categories()),
             "discovery_instructions": (
                 "After restart, ask Alexa to discover devices or use the Alexa app."
             ),
@@ -216,7 +219,7 @@ class AlexaExposureManagerRuntime:
         return result
 
     async def async_migration_preview(self) -> dict[str, Any]:
-        """Flatten the active legacy filter using HA EntityFilter semantics."""
+        """Flatten the active legacy filter using HA Alexa exposure semantics."""
         catalog_response = await self.async_entities()
         catalog = catalog_response["entities"]
         legacy_filter = self.startup_alexa.get("filter", {})
@@ -243,12 +246,10 @@ class AlexaExposureManagerRuntime:
         for entity in catalog:
             if entity["missing"]:
                 continue
-            exposed = (
-                entity.get("default_exposed", True)
-                if not any(legacy_filter.values())
-                else compatibility.evaluate_entity_filter(
-                    legacy_filter, entity["entity_id"]
-                )
+            exposed = compatibility.alexa_effective_exposure(
+                legacy_filter,
+                entity["entity_id"],
+                default_exposed=bool(entity.get("default_exposed", True)),
             )
             if entity["supported"]:
                 counts["exposed" if exposed else "hidden"] += 1
@@ -266,7 +267,11 @@ class AlexaExposureManagerRuntime:
             proposed_entities.append(
                 self._migration_entity(
                     entity_id,
-                    compatibility.evaluate_entity_filter(legacy_filter, entity_id),
+                    compatibility.alexa_effective_exposure(
+                        legacy_filter,
+                        entity_id,
+                        default_exposed=True,
+                    ),
                     legacy_metadata.get(entity_id),
                 )
             )
@@ -311,10 +316,17 @@ class AlexaExposureManagerRuntime:
             raise InvalidManagedConfigurationError(
                 "Migration revisions changed; create a new preview"
             )
+        expose_new_entities = message.get(
+            "expose_new_entities", preview["expose_new_entities"]
+        )
+        if not isinstance(expose_new_entities, bool):
+            raise InvalidManagedConfigurationError(
+                "expose_new_entities must be true or false"
+            )
         result = await self.transaction.async_save(
             expected_revision=preview["expected_revision"],
             expected_entities_revision=preview["expected_entities_revision"],
-            expose_new_entities=preview["expose_new_entities"],
+            expose_new_entities=expose_new_entities,
             entities=preview["entities"],
             known_entity_ids=preview["known_entity_ids"],
         )
@@ -335,7 +347,7 @@ class AlexaExposureManagerRuntime:
             expected_entities_revision=message["expected_entities_revision"],
         )
         await self._record_restart_required(result)
-        return result
+        return {**result, "last_validation": self._state.get("last_validation")}
 
     async def async_restart(self, user_id: str) -> dict[str, bool]:
         """Call Home Assistant's restart service with the requesting user context."""
@@ -406,6 +418,9 @@ class AlexaExposureManagerRuntime:
             "revision": result["revision"],
             "entities_revision": result["entities_revision"],
         }
+        self._state["last_validation"] = result.get(
+            "last_validation", self.transaction.last_validation
+        )
         await self._async_save_state()
 
     async def _async_save_state(self) -> None:
@@ -417,11 +432,21 @@ class AlexaExposureManagerRuntime:
             and self.startup_alexa.get("entity_config_active")
         ):
             return False
+        restart_revisions = self._state.get("restart_revisions") or {}
+        snapshot = await self.transaction.async_read()
+        if (
+            snapshot["revision"] != restart_revisions.get("revision")
+            or snapshot["entities_revision"]
+            != restart_revisions.get("entities_revision")
+        ):
+            return False
         files = await self.transaction.async_support_export()
+        from .const import ENTITY_CONFIG_FILENAME, FILTER_FILENAME
+
         return (
-            yaml.safe_load(files["alexa_exposure_filter.yaml"]) or {}
+            yaml.safe_load(files[FILTER_FILENAME]) or {}
         ) == self.startup_alexa.get("filter", {}) and (
-            yaml.safe_load(files["alexa_entity_config.yaml"]) or {}
+            yaml.safe_load(files[ENTITY_CONFIG_FILENAME]) or {}
         ) == self.startup_alexa.get("entity_config", {})
 
     @staticmethod

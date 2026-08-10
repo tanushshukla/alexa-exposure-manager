@@ -174,11 +174,19 @@ async def test_status_command_returns_nested_instructions_without_secrets() -> N
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "parent_include",
+    [
+        "alexa: !include alexa.yaml\n",
+        "alexa: !include my_alexa.yaml\n",
+    ],
+)
 async def test_status_activation_comes_from_resolved_nested_includes(
-    tmp_path,
+    tmp_path, parent_include
 ) -> None:
-    (tmp_path / "configuration.yaml").write_text("alexa: !include alexa.yaml\n")
-    (tmp_path / "alexa.yaml").write_text(
+    parent_name = parent_include.split("!include ", 1)[1].strip()
+    (tmp_path / "configuration.yaml").write_text(parent_include)
+    (tmp_path / parent_name).write_text(
         "smart_home:\n"
         "  client_secret: never-return-this\n"
         "  filter: !include alexa_exposure_filter.yaml\n"
@@ -214,6 +222,7 @@ async def test_status_activation_comes_from_resolved_nested_includes(
     runtime._state = {
         "restart_required": False,
         "migration_state": "not_started",
+        "last_validation": None,
     }
 
     connection = await call_command(
@@ -285,11 +294,13 @@ async def test_migration_preview_uses_home_assistant_filter_precedence(
                     "entity_id": "light.public",
                     "supported": True,
                     "missing": False,
+                    "default_exposed": True,
                 },
                 {
                     "entity_id": "light.secret",
                     "supported": True,
                     "missing": False,
+                    "default_exposed": True,
                 },
             ],
         }
@@ -370,3 +381,58 @@ async def test_restart_command_passes_requesting_admin_context() -> None:
     assert connection.results == [(5, {"requested": True})]
     assert calls[0][0:3] == ("homeassistant", "restart", {})
     assert calls[0][3]["context"].user_id == "user-1"
+
+
+@pytest.mark.asyncio
+async def test_empty_filter_migration_uses_default_exposed_semantics() -> None:
+    class Transaction:
+        async def async_preview(self, **_kwargs):
+            return {
+                "revision": "filter-r1",
+                "entities_revision": "entities-r1",
+                "filter_yaml": "preview-filter",
+                "entity_config_yaml": "preview-entities",
+            }
+
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = {"filter": {}, "entity_config": {}}
+    runtime.transaction = Transaction()
+    runtime._migration_previews = {}
+
+    async def async_entities():
+        return {
+            "revision": "filter-r1",
+            "entities_revision": "entities-r1",
+            "entities": [
+                {
+                    "entity_id": "light.public",
+                    "supported": True,
+                    "missing": False,
+                    "default_exposed": True,
+                },
+                {
+                    "entity_id": "sensor.diagnostics",
+                    "supported": True,
+                    "missing": False,
+                    "default_exposed": False,
+                },
+            ],
+        }
+
+    runtime.async_entities = async_entities
+    connection = await call_command(
+        websocket_migration_preview,
+        runtime,
+        {"id": 7, "type": "alexa_exposure_manager/migration/preview"},
+    )
+
+    assert connection.results[0][1]["counts"] == {
+        "exposed": 1,
+        "hidden": 1,
+        "unsupported": 0,
+        "missing": 0,
+    }

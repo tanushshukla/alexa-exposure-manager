@@ -21,6 +21,7 @@ from yaml.tokens import AliasToken, AnchorToken, TagToken
 from .const import (
     BACKUP_DIRECTORY,
     BACKUP_RETENTION,
+    DISPLAY_CATEGORIES,
     ENTITY_CONFIG_FILENAME,
     FILTER_FILENAME,
 )
@@ -34,55 +35,6 @@ _MODE_MARKER = re.compile(
 )
 _FILTER_KEYS = frozenset({"include_entities", "exclude_entities"})
 _ENTITY_CONFIG_KEYS = frozenset({"name", "description", "display_categories"})
-_DEFAULT_DISPLAY_CATEGORIES = frozenset(
-    {
-        "ACTIVITY_TRIGGER",
-        "AIR_CONDITIONER",
-        "AIR_FRESHENER",
-        "AIR_PURIFIER",
-        "AUTO_ACCESSORY",
-        "CAMERA",
-        "CHRISTMAS_TREE",
-        "COFFEE_MAKER",
-        "CONTACT_SENSOR",
-        "DOOR",
-        "DOORBELL",
-        "EXTERIOR_BLIND",
-        "FAN",
-        "GAME_CONSOLE",
-        "GARAGE_DOOR",
-        "HEADPHONES",
-        "HUB",
-        "INTERIOR_BLIND",
-        "LAPTOP",
-        "LIGHT",
-        "MICROWAVE",
-        "MOBILE_PHONE",
-        "MOTION_SENSOR",
-        "MUSIC_SYSTEM",
-        "NETWORK_HARDWARE",
-        "OTHER",
-        "OVEN",
-        "PHONE",
-        "PRINTER",
-        "ROUTER",
-        "SCENE_TRIGGER",
-        "SCREEN",
-        "SECURITY_PANEL",
-        "SMARTLOCK",
-        "SMARTPLUG",
-        "SPEAKER",
-        "STREAMING_DEVICE",
-        "SWITCH",
-        "TABLET",
-        "TEMPERATURE_SENSOR",
-        "THERMOSTAT",
-        "TV",
-        "VACUUM_CLEANER",
-        "WATER_HEATER",
-        "WEARABLE",
-    }
-)
 
 
 class _IndentedSafeDumper(yaml.SafeDumper):
@@ -139,8 +91,7 @@ class ManagedFileTransaction:
         executor: Executor,
         validator: Validator,
         *,
-        display_category_lists: bool = False,
-        valid_display_categories: Collection[str] = _DEFAULT_DISPLAY_CATEGORIES,
+        valid_display_categories: Collection[str] = DISPLAY_CATEGORIES,
     ) -> None:
         self.config_dir = Path(config_dir)
         self.filter_path = self.config_dir / FILTER_FILENAME
@@ -148,7 +99,6 @@ class ManagedFileTransaction:
         self.backup_path = self.config_dir / BACKUP_DIRECTORY
         self._executor = executor
         self._validator = validator
-        self._display_category_lists = display_category_lists
         self._valid_display_categories = frozenset(valid_display_categories)
         self._lock = asyncio.Lock()
         self.last_validation: dict[str, Any] | None = None
@@ -213,44 +163,17 @@ class ManagedFileTransaction:
                 entities,
                 set(known_entity_ids),
             )
-            old_filter, old_entities = await self._executor(self._read_bytes_pair)
-            try:
-                await self._executor(self._backup_and_replace, filter_text, entity_text)
-            except OSError as error:
-                raise ManagedFilesError(
+            return await self._async_commit_bytes(
+                filter_text.encode(),
+                entity_text.encode(),
+                write_error=(
                     "Managed file write failed; the previous files were restored"
-                ) from error
-            validation_error = await self._validator()
-            if validation_error is not None:
-                try:
-                    await self._executor(
-                        self._replace_bytes_pair, old_filter, old_entities
-                    )
-                except OSError as rollback_error:
-                    self.last_validation = {
-                        "ok": False,
-                        "error": validation_error,
-                        "rollback": "failed",
-                    }
-                    raise ValidationFailedError(
-                        "Home Assistant rejected the configuration and automatic "
-                        f"rollback failed: {rollback_error}"
-                    ) from rollback_error
-                self.last_validation = {
-                    "ok": False,
-                    "error": validation_error,
-                    "rollback": "complete",
-                }
-                raise ValidationFailedError(validation_error)
-
-            self.last_validation = {"ok": True, "error": None}
-            saved = await self._executor(self._read_pair)
-            return {
-                "revision": saved.revision,
-                "entities_revision": saved.entities_revision,
-                "expose_new_entities": saved.expose_new_entities,
-                "restart_required": True,
-            }
+                ),
+                rollback_error_prefix=(
+                    "Home Assistant rejected the configuration and automatic rollback "
+                    "failed"
+                ),
+            )
 
     async def async_list_backups(self) -> list[dict[str, Any]]:
         """List retained backup pairs, newest first."""
@@ -273,46 +196,63 @@ class ManagedFileTransaction:
             backup = self._parse_pair(backup_filter, backup_entities)
             if backup.read_only_reasons:
                 raise ManagedYamlReadOnlyError("; ".join(backup.read_only_reasons))
-            old_filter, old_entities = await self._executor(self._read_bytes_pair)
-            try:
-                await self._executor(
-                    self._backup_and_replace_bytes, backup_filter, backup_entities
-                )
-            except OSError as error:
-                raise ManagedFilesError(
+            return await self._async_commit_bytes(
+                backup_filter,
+                backup_entities,
+                write_error=(
                     "Backup restore write failed; the previous files were restored"
-                ) from error
-            validation_error = await self._validator()
-            if validation_error is not None:
-                try:
-                    await self._executor(
-                        self._replace_bytes_pair, old_filter, old_entities
-                    )
-                except OSError as rollback_error:
-                    self.last_validation = {
-                        "ok": False,
-                        "error": validation_error,
-                        "rollback": "failed",
-                    }
-                    raise ValidationFailedError(
-                        "Home Assistant rejected the restored configuration and "
-                        f"automatic rollback failed: {rollback_error}"
-                    ) from rollback_error
+                ),
+                rollback_error_prefix=(
+                    "Home Assistant rejected the restored configuration and automatic "
+                    "rollback failed"
+                ),
+            )
+
+    async def _async_commit_bytes(
+        self,
+        filter_bytes: bytes,
+        entity_bytes: bytes,
+        *,
+        write_error: str,
+        rollback_error_prefix: str,
+    ) -> dict[str, Any]:
+        """Backup, replace, validate, and roll back both managed files together."""
+        old_filter, old_entities = await self._executor(self._read_bytes_pair)
+        try:
+            await self._executor(
+                self._backup_and_replace_bytes, filter_bytes, entity_bytes
+            )
+        except OSError as error:
+            raise ManagedFilesError(write_error) from error
+        validation_error = await self._validator()
+        if validation_error is not None:
+            try:
+                await self._executor(self._replace_bytes_pair, old_filter, old_entities)
+            except OSError as rollback_error:
                 self.last_validation = {
                     "ok": False,
                     "error": validation_error,
-                    "rollback": "complete",
+                    "rollback": "failed",
                 }
-                raise ValidationFailedError(validation_error)
-
-            self.last_validation = {"ok": True, "error": None}
-            restored = await self._executor(self._read_pair)
-            return {
-                "revision": restored.revision,
-                "entities_revision": restored.entities_revision,
-                "expose_new_entities": restored.expose_new_entities,
-                "restart_required": True,
+                raise ValidationFailedError(
+                    f"{rollback_error_prefix}: {rollback_error}"
+                ) from rollback_error
+            self.last_validation = {
+                "ok": False,
+                "error": validation_error,
+                "rollback": "complete",
             }
+            raise ValidationFailedError(validation_error)
+
+        self.last_validation = {"ok": True, "error": None, "rollback": None}
+        saved = await self._executor(self._read_pair)
+        return {
+            "revision": saved.revision,
+            "entities_revision": saved.entities_revision,
+            "expose_new_entities": saved.expose_new_entities,
+            "restart_required": True,
+            "last_validation": self.last_validation,
+        }
 
     async def async_support_export(self) -> dict[str, str]:
         """Return the complete managed YAML for an explicitly confirmed export."""
@@ -421,8 +361,8 @@ class ManagedFileTransaction:
                 categories = raw_metadata["display_categories"]
                 if isinstance(categories, str):
                     categories = [categories]
-                elif isinstance(categories, list) and self._display_category_lists:
-                    categories = list(categories)
+                elif isinstance(categories, list) and categories:
+                    categories = [str(categories[0])]
                 else:
                     reasons.append(
                         f"display_categories for {raw_entity_id} uses an "
@@ -433,7 +373,7 @@ class ManagedFileTransaction:
                     raw_entity_id, categories, reasons
                 )
                 if valid_categories:
-                    metadata["display_categories"] = valid_categories
+                    metadata["display_categories"] = valid_categories[:1]
             parsed_entity_config[raw_entity_id] = metadata
 
         return _ParsedPair(
@@ -489,39 +429,41 @@ class ManagedFileTransaction:
     def _validate_categories(
         self, entity_id: str, categories: list[Any], reasons: list[str]
     ) -> list[str]:
-        validated: list[str] = []
-        for category in categories:
-            if (
-                not isinstance(category, str)
-                or category not in self._valid_display_categories
-            ):
-                reasons.append(
-                    f"display_categories for {entity_id} contains invalid "
-                    f"category {category!r}"
-                )
-                continue
-            if category not in validated:
-                validated.append(category)
-        if len(validated) > 1 and not self._display_category_lists:
+        if not categories:
+            return []
+        category = categories[0]
+        if (
+            not isinstance(category, str)
+            or category not in self._valid_display_categories
+        ):
             reasons.append(
-                "This Home Assistant version accepts only one Alexa display category"
+                f"display_categories for {entity_id} contains invalid "
+                f"category {category!r}"
             )
-        return validated
+            return []
+        return [category]
+
+    @staticmethod
+    def _exposure_map(
+        expose_new_entities: bool,
+        filter_entities: set[str],
+        entity_ids: Collection[str],
+    ) -> dict[str, bool]:
+        if expose_new_entities:
+            return {
+                entity_id: entity_id not in filter_entities for entity_id in entity_ids
+            }
+        return {entity_id: entity_id in filter_entities for entity_id in entity_ids}
 
     def _snapshot(
         self, parsed: _ParsedPair, known_entity_ids: set[str]
     ) -> dict[str, Any]:
         all_entity_ids = known_entity_ids | parsed.configured_entity_ids
-        if parsed.expose_new_entities:
-            exposure = {
-                entity_id: entity_id not in parsed.filter_entities
-                for entity_id in sorted(all_entity_ids)
-            }
-        else:
-            exposure = {
-                entity_id: entity_id in parsed.filter_entities
-                for entity_id in sorted(all_entity_ids)
-            }
+        exposure = self._exposure_map(
+            parsed.expose_new_entities,
+            parsed.filter_entities,
+            sorted(all_entity_ids),
+        )
         return {
             "revision": parsed.revision,
             "entities_revision": parsed.entities_revision,
@@ -543,15 +485,9 @@ class ManagedFileTransaction:
         known_entity_ids: set[str],
     ) -> tuple[str, str, dict[str, bool], dict[str, dict[str, Any]]]:
         universe = known_entity_ids | parsed.configured_entity_ids
-        if parsed.expose_new_entities:
-            exposure = {
-                entity_id: entity_id not in parsed.filter_entities
-                for entity_id in universe
-            }
-        else:
-            exposure = {
-                entity_id: entity_id in parsed.filter_entities for entity_id in universe
-            }
+        exposure = self._exposure_map(
+            parsed.expose_new_entities, parsed.filter_entities, universe
+        )
         entity_config = {
             entity_id: dict(metadata)
             for entity_id, metadata in parsed.entity_config.items()
@@ -614,8 +550,6 @@ class ManagedFileTransaction:
             if metadata or entity_id in entity_config:
                 entity_config[entity_id] = metadata
 
-        # A missing explicit ID can disappear when the representation changes.
-        # Keep an empty entity_config entry so it remains reviewable and reversible.
         if expose_new_entities != parsed.expose_new_entities:
             for entity_id in (
                 parsed.configured_entity_ids - known_entity_ids - removed_entity_ids
@@ -661,9 +595,7 @@ class ManagedFileTransaction:
                 if key in source:
                     metadata[key] = source[key]
             if categories := source.get("display_categories"):
-                metadata["display_categories"] = (
-                    list(categories) if self._display_category_lists else categories[0]
-                )
+                metadata["display_categories"] = categories[0]
             rendered[entity_id] = metadata
         return yaml.dump(
             rendered,

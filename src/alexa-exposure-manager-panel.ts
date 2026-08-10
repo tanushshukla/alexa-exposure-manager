@@ -9,7 +9,7 @@ import type {
   StatusResponse,
   ValidationIssue,
 } from "./types";
-import { displayCategories, t } from "./translations";
+import { displayCategories, setActiveLocalize, t } from "./translations";
 
 export class AlexaExposureManagerPanel extends LitElement {
   static properties = {
@@ -170,6 +170,11 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   protected render() {
+    setActiveLocalize(
+      this.hass?.localize
+        ? (key, values) => this.hass!.localize!(key, values)
+        : undefined,
+    );
     return html`
       <main class=${this.narrow ? "narrow" : ""}>
         ${this.loading

@@ -52,7 +52,9 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry
 ) -> dict[str, Any]:
     """Return the same redacted diagnostics exposed to administrators."""
-    runtime = hass.data.get(DOMAIN, {}).get(DATA_RUNTIME, {}).get(entry.entry_id)
+    domain_data = hass.data.get(DOMAIN) or {}
+    runtimes = domain_data.get(DATA_RUNTIME) or {}
+    runtime = runtimes.get(entry.entry_id)
     if runtime is None:
         return {"domain": DOMAIN, "versions": {"integration": VERSION}}
     return await runtime.async_diagnostics()

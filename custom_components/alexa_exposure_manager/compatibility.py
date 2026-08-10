@@ -3,59 +3,57 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
+from .const import ENTITY_CONFIG_FILENAME, FILTER_FILENAME
 
-def _plain(value: Any) -> Any:
-    """Remove annotated-YAML wrappers while retaining only safe Alexa fields."""
+
+def sanitize_alexa_mapping(value: Any) -> Any:
+    """Unwrap annotated YAML nodes while retaining only plain Alexa-safe values."""
     if isinstance(value, Mapping):
-        return {str(key): _plain(item) for key, item in value.items()}
+        return {str(key): sanitize_alexa_mapping(item) for key, item in value.items()}
     if isinstance(value, list):
-        return [_plain(item) for item in value]
+        return [sanitize_alexa_mapping(item) for item in value]
     if isinstance(value, str | int | float | bool) or value is None:
         return value
     config = getattr(value, "config", None)
     if isinstance(config, Mapping):
-        return _plain(config)
+        return sanitize_alexa_mapping(config)
     return None
 
 
-def _annotation_matches_line(
-    annotation: tuple[str, int | str] | None, expected_line: str
+def _annotation_includes_managed_file(
+    annotation: tuple[str, int | str] | None, filename: str
 ) -> bool:
-    """Check one annotated resolved-config line without parsing nearby secrets."""
-    if annotation is None or not isinstance(annotation[1], int):
+    """Return whether a resolved annotation is the managed include or file itself."""
+    if annotation is None:
+        return False
+    source = str(annotation[0])
+    if Path(source).name == filename:
+        return True
+    if not isinstance(annotation[1], int):
         return False
     try:
-        with open(annotation[0], encoding="utf-8") as file_handle:
+        with open(source, encoding="utf-8") as file_handle:
             for line_number, line in enumerate(file_handle, start=1):
-                if line_number == annotation[1]:
-                    return line.strip() == expected_line
+                if line_number != annotation[1]:
+                    continue
+                stripped = " ".join(line.strip().split())
+                return f"!include {filename}" in stripped
     except OSError:
         return False
     return False
 
 
 def _activation_from_annotations(
-    alexa_annotation: tuple[str, int | str] | None,
     filter_annotation: tuple[str, int | str] | None,
     entity_annotation: tuple[str, int | str] | None,
 ) -> tuple[bool, bool]:
-    """Verify the exact nested include structure outside the event loop."""
-    containing_file_active = _annotation_matches_line(
-        alexa_annotation, "alexa: !include alexa.yaml"
-    )
+    """Verify both managed includes without requiring a fixed parent Alexa path."""
     return (
-        containing_file_active
-        and _annotation_matches_line(
-            filter_annotation,
-            "filter: !include alexa_exposure_filter.yaml",
-        ),
-        containing_file_active
-        and _annotation_matches_line(
-            entity_annotation,
-            "entity_config: !include alexa_entity_config.yaml",
-        ),
+        _annotation_includes_managed_file(filter_annotation, FILTER_FILENAME),
+        _annotation_includes_managed_file(entity_annotation, ENTITY_CONFIG_FILENAME),
     )
 
 
@@ -88,16 +86,14 @@ async def async_resolved_alexa_config(hass) -> dict[str, Any]:
             "issues": ["alexa.smart_home is not configured"],
         }
 
-    filter_config = _plain(smart_home.get("filter") or {})
-    entity_config = _plain(smart_home.get("entity_config") or {})
-    alexa_annotation = find_annotation(config, ["alexa"])
+    filter_config = sanitize_alexa_mapping(smart_home.get("filter") or {})
+    entity_config = sanitize_alexa_mapping(smart_home.get("entity_config") or {})
     filter_annotation = find_annotation(config, ["alexa", "smart_home", "filter"])
     entity_annotation = find_annotation(
         config, ["alexa", "smart_home", "entity_config"]
     )
     filter_active, entity_active = await hass.async_add_executor_job(
         _activation_from_annotations,
-        alexa_annotation,
         filter_annotation,
         entity_annotation,
     )
@@ -148,6 +144,11 @@ async def async_validate_full_config(hass) -> str | None:
     )
 
 
+def filter_config_is_empty(filter_config: Mapping[str, Any]) -> bool:
+    """Return whether a legacy Alexa filter contains no include/exclude rules."""
+    return not any(bool(value) for value in filter_config.values())
+
+
 def evaluate_entity_filter(filter_config: Mapping[str, Any], entity_id: str) -> bool:
     """Evaluate an entity ID with Home Assistant EntityFilter precedence."""
     from homeassistant.helpers.entityfilter import FILTER_SCHEMA
@@ -156,21 +157,23 @@ def evaluate_entity_filter(filter_config: Mapping[str, Any], entity_id: str) -> 
     return bool(entity_filter(entity_id))
 
 
-def alexa_display_category_lists_supported() -> bool:
-    """Return whether the targeted Alexa YAML schema accepts category lists."""
-    # HA 2026.6-2026.8 validates display_categories as a scalar string.
-    return False
+def alexa_effective_exposure(
+    filter_config: Mapping[str, Any],
+    entity_id: str,
+    *,
+    default_exposed: bool,
+) -> bool:
+    """Match local Alexa exposure semantics for empty and non-empty filters."""
+    if filter_config_is_empty(filter_config):
+        return default_exposed
+    return evaluate_entity_filter(filter_config, entity_id)
 
 
 def alexa_display_categories() -> set[str]:
-    """Return display category values from Home Assistant's Alexa adapter."""
-    from homeassistant.components.alexa.entities import DisplayCategory
+    """Return the Alexa display category vocabulary for managed YAML validation."""
+    from .const import DISPLAY_CATEGORIES
 
-    return {
-        value
-        for name, value in vars(DisplayCategory).items()
-        if name.isupper() and isinstance(value, str)
-    }
+    return set(DISPLAY_CATEGORIES)
 
 
 class _CatalogAlexaConfig:

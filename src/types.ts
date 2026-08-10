@@ -2,6 +2,7 @@ export interface HomeAssistant {
   connection: {
     sendMessagePromise<T>(message: WebSocketMessage): Promise<T>;
   };
+  localize?: (key: string, values?: Record<string, string | number>) => string;
   states?: Record<string, HomeAssistantState>;
   devices?: Record<string, HomeAssistantDevice>;
   areas?: Record<string, HomeAssistantArea>;

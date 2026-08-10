@@ -23,7 +23,9 @@ inside Home Assistant.
    support state, device and area context, and one exposed or hidden state.
 3. **Add entities** opens a searchable, virtualized checklist.
 4. Individual entity dialogs show Home Assistant context and Alexa-specific
-   name, description, and ordered display categories.
+   name, description, and one display category. Home Assistant 2026.6–2026.8
+   accepts a single Alexa display category string in YAML; the inferred default
+   is shown when no override is set.
 5. A persistent pending-change indicator and save action cover all staged edits.
 6. A restart-required banner offers **Restart Home Assistant** and **Later**.
 7. A collapsed **Advanced** section contains YAML preview, revisions, validation
@@ -76,5 +78,7 @@ managed representation, so existing exposure does not change unexpectedly.
 - Touch targets follow Home Assistant component sizing.
 - Status changes use appropriate live-region behavior without excessive
   announcements.
-- All user-facing strings use Home Assistant translation resources, with English
-  as the initial language.
+- All user-facing strings use Home Assistant translation resources under
+  `component.alexa_exposure_manager.*`, with English as the initial language.
+  The Lit panel prefers `hass.localize` and falls back to the shipped English
+  catalog when a key is not loaded yet.

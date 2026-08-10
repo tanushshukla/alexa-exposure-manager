@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 
 from custom_components.alexa_exposure_manager.managed_files import (
-    InvalidManagedConfigurationError,
     ManagedFilesError,
     ManagedFileTransaction,
     ManagedYamlReadOnlyError,
@@ -346,30 +345,30 @@ async def test_restore_validation_failure_rolls_back_to_pre_restore_pair(
 
 
 @pytest.mark.asyncio
-async def test_multiple_display_categories_are_rejected_when_ha_schema_is_scalar(
+async def test_only_primary_display_category_is_written_for_ha_yaml_schema(
     tmp_path: Path,
 ) -> None:
     managed = transaction(tmp_path)
     await managed.async_initialize()
     snapshot = await managed.async_read({"light.one"})
 
-    with pytest.raises(
-        InvalidManagedConfigurationError,
-        match="accepts only one Alexa display category",
-    ):
-        await managed.async_save(
-            expected_revision=snapshot["revision"],
-            expected_entities_revision=snapshot["entities_revision"],
-            expose_new_entities=False,
-            entities=[
-                {
-                    "entity_id": "light.one",
-                    "exposed": True,
-                    "display_categories": ["LIGHT", "SWITCH"],
-                }
-            ],
-            known_entity_ids={"light.one"},
-        )
+    await managed.async_save(
+        expected_revision=snapshot["revision"],
+        expected_entities_revision=snapshot["entities_revision"],
+        expose_new_entities=False,
+        entities=[
+            {
+                "entity_id": "light.one",
+                "exposed": True,
+                "display_categories": ["LIGHT", "SWITCH"],
+            }
+        ],
+        known_entity_ids={"light.one"},
+    )
+
+    assert (tmp_path / "alexa_entity_config.yaml").read_text() == (
+        "light.one:\n  display_categories: LIGHT\n"
+    )
 
 
 @pytest.mark.asyncio

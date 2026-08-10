@@ -194,9 +194,21 @@ const english = {
 
 export type TranslationKey = keyof typeof english;
 
+type LocalizeFn = (lookup: string, vars?: Record<string, string | number>) => string;
+
+let activeLocalize: LocalizeFn | undefined;
+
+export function setActiveLocalize(localize?: LocalizeFn) {
+  activeLocalize = localize;
+}
+
 export function t(key: TranslationKey, values: Record<string, string | number> = {}): string {
+  const resourceKey = `component.alexa_exposure_manager.panel.${key}`;
+  const localized = activeLocalize?.(resourceKey, values);
+  const template =
+    localized && localized !== resourceKey ? localized : (english[key] as string);
   return Object.entries(values).reduce(
     (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)),
-    english[key] as string,
+    template,
   );
 }
