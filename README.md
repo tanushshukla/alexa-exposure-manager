@@ -49,18 +49,29 @@ this repository has not been tagged or published by this change.
   documentation](https://www.home-assistant.io/integrations/alexa.smart_home/).
 - A current Home Assistant backup and a safe way to edit files under `/config`.
 
-## Install With HACS
+## Installation
+
+### HACS (Recommended)
+
+Alexa Exposure Manager is available in HACS (Home Assistant Community Store) as
+a custom repository.
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tanushshukla&repository=alexa-exposure-manager&category=integration)
+
+or
+
+1. Install [HACS](https://hacs.xyz) if you don't have it already
+2. Open HACS in Home Assistant
+3. Open the three-dot menu and select **Custom repositories**
+4. Enter `https://github.com/tanushshukla/alexa-exposure-manager`
+5. Select **Integration** as the category and add the repository
+6. Search for "Alexa Exposure Manager"
+7. Click the download button ⬇️
+8. Restart Home Assistant when HACS requests it
+9. Go to **Settings > Devices & services > Add integration**, search for
+   **Alexa Exposure Manager**, and complete its config flow
 
 These steps apply after a valid `0.1.0` or later release has been published.
-
-1. Open HACS in Home Assistant.
-2. Open the three-dot menu and select **Custom repositories**.
-3. Enter `https://github.com/tanushshukla/alexa-exposure-manager`.
-4. Select **Integration** as the category and add the repository.
-5. Search for **Alexa Exposure Manager**, select it, and choose **Download**.
-6. Restart Home Assistant when HACS requests it.
-7. Go to **Settings > Devices & services > Add integration**.
-8. Search for **Alexa Exposure Manager** and complete its config flow.
 
 Do not add YAML for the custom integration itself. The config flow creates one
 config entry and creates the two managed files only when they are absent.
