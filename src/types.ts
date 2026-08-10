@@ -58,6 +58,15 @@ export interface StatusResponse {
   editing_enabled?: boolean;
   read_only?: boolean;
   read_only_reasons?: string[];
+  last_validation?: LastValidation | null;
+  migration_state?: string;
+}
+
+export interface LastValidation {
+  ok?: boolean;
+  error?: string | null;
+  rollback?: string | null;
+  at?: string;
 }
 
 export interface EntitiesResponse {

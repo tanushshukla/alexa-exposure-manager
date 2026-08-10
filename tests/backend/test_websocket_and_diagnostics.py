@@ -350,6 +350,15 @@ async def test_migration_preview_uses_home_assistant_filter_precedence(
     runtime.startup_alexa = {"filter": legacy_filter, "entity_config": {}}
     runtime.transaction = Transaction()
     runtime._migration_previews = {}
+    runtime._state = {
+        "restart_required": False,
+        "migration_state": "not_started",
+    }
+
+    async def _async_save_state():
+        return None
+
+    runtime._async_save_state = _async_save_state
 
     async def async_entities():
         return {
@@ -468,6 +477,15 @@ async def test_empty_filter_migration_uses_default_exposed_semantics() -> None:
     runtime.startup_alexa = {"filter": {}, "entity_config": {}}
     runtime.transaction = Transaction()
     runtime._migration_previews = {}
+    runtime._state = {
+        "restart_required": False,
+        "migration_state": "not_started",
+    }
+
+    async def _async_save_state():
+        return None
+
+    runtime._async_save_state = _async_save_state
 
     async def async_entities():
         return {

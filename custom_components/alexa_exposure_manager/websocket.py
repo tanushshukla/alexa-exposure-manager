@@ -23,7 +23,11 @@ ENTITY_UPDATE_SCHEMA = {
     vol.Optional("remove"): bool,
     vol.Optional("name"): vol.Any(str, None),
     vol.Optional("description"): vol.Any(str, None),
-    vol.Optional("display_categories"): vol.Any([str], None),
+    # Home Assistant validates alexa.smart_home entity_config display_categories
+    # as a single scalar, so the API refuses lists it would have to truncate.
+    vol.Optional("display_categories"): vol.Any(
+        vol.All([str], vol.Length(max=1)), None
+    ),
 }
 
 

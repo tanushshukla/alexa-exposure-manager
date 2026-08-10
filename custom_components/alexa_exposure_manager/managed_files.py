@@ -30,9 +30,6 @@ Executor = Callable[..., Awaitable[Any]]
 Validator = Callable[[], Awaitable[str | None]]
 
 _ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
-_MODE_MARKER = re.compile(
-    r"^# alexa_exposure_manager: expose_new_entities=(true|false)$", re.MULTILINE
-)
 _FILTER_KEYS = frozenset({"include_entities", "exclude_entities"})
 _ENTITY_CONFIG_KEYS = frozenset({"name", "description", "display_categories"})
 
@@ -233,6 +230,7 @@ class ManagedFileTransaction:
                     "ok": False,
                     "error": validation_error,
                     "rollback": "failed",
+                    "at": self._now(),
                 }
                 raise ValidationFailedError(
                     f"{rollback_error_prefix}: {rollback_error}"
@@ -241,10 +239,16 @@ class ManagedFileTransaction:
                 "ok": False,
                 "error": validation_error,
                 "rollback": "complete",
+                "at": self._now(),
             }
             raise ValidationFailedError(validation_error)
 
-        self.last_validation = {"ok": True, "error": None, "rollback": None}
+        self.last_validation = {
+            "ok": True,
+            "error": None,
+            "rollback": None,
+            "at": self._now(),
+        }
         saved = await self._executor(self._read_pair)
         return {
             "revision": saved.revision,
@@ -311,15 +315,12 @@ class ManagedFileTransaction:
                 "The filter contains both include_entities and exclude_entities"
             )
 
-        marker_match = _MODE_MARKER.search(filter_text)
-        if marker_match:
-            expose_new_entities = marker_match.group(1) == "true"
-        else:
-            expose_new_entities = "exclude_entities" in present_filter_keys
-
+        # The filter key is the only source of truth for the exposure mode:
+        # exclude_entities is a blocklist (expose new entities on), and
+        # include_entities is an allowlist (off). A file with neither key
+        # defaults to off so that Alexa access stays opt-in.
+        expose_new_entities = "exclude_entities" in present_filter_keys
         expected_key = "exclude_entities" if expose_new_entities else "include_entities"
-        if present_filter_keys and expected_key not in present_filter_keys:
-            reasons.append("The exposure mode marker conflicts with the filter key")
 
         raw_filter_entities = filter_data.get(expected_key, [])
         filter_entities = self._string_entity_list(
@@ -579,19 +580,16 @@ class ManagedFileTransaction:
 
     @staticmethod
     def _render_filter(expose_new_entities: bool, entity_ids: set[str]) -> str:
+        # exclude_entities means new entities are exposed; include_entities
+        # means they are hidden. The key alone carries the mode.
         key = "exclude_entities" if expose_new_entities else "include_entities"
-        marker = str(expose_new_entities).lower()
         data = {key: sorted(entity_ids)}
-        return (
-            "# Managed by Alexa Exposure Manager.\n"
-            f"# alexa_exposure_manager: expose_new_entities={marker}\n"
-            + yaml.dump(
-                data,
-                Dumper=_IndentedSafeDumper,
-                allow_unicode=True,
-                default_flow_style=False,
-                sort_keys=False,
-            )
+        return "# Managed by Alexa Exposure Manager.\n" + yaml.dump(
+            data,
+            Dumper=_IndentedSafeDumper,
+            allow_unicode=True,
+            default_flow_style=False,
+            sort_keys=False,
         )
 
     def _render_entity_config(
@@ -678,6 +676,11 @@ class ManagedFileTransaction:
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
+
+    @staticmethod
+    def _now() -> str:
+        """Return an ISO-8601 UTC timestamp for operational state records."""
+        return datetime.now(UTC).isoformat(timespec="seconds")
 
     def _create_backup(self, filter_bytes: bytes, entity_bytes: bytes) -> None:
         self.backup_path.mkdir(mode=0o700, parents=True, exist_ok=True)

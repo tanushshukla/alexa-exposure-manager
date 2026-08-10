@@ -41,6 +41,62 @@ async def test_setup_creates_only_missing_managed_files(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_filter_key_alone_determines_exposure_mode(tmp_path: Path) -> None:
+    """A hand-edited mode switch must be honoured, not locked out."""
+    filter_path = tmp_path / "alexa_exposure_filter.yaml"
+    filter_path.write_text(
+        "# Managed by Alexa Exposure Manager.\n"
+        "# alexa_exposure_manager: expose_new_entities=false\n"
+        "exclude_entities:\n"
+        "  - light.hidden\n"
+    )
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+
+    snapshot = await managed.async_read({"light.hidden", "light.other"})
+
+    assert snapshot["expose_new_entities"] is True
+    assert snapshot["read_only"] is False
+    assert snapshot["read_only_reasons"] == []
+    assert snapshot["exposure"] == {"light.hidden": False, "light.other": True}
+
+
+@pytest.mark.asyncio
+async def test_filter_without_any_key_defaults_to_new_entities_hidden(
+    tmp_path: Path,
+) -> None:
+    filter_path = tmp_path / "alexa_exposure_filter.yaml"
+    filter_path.write_text("# Managed by Alexa Exposure Manager.\n")
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+
+    snapshot = await managed.async_read({"light.other"})
+
+    assert snapshot["expose_new_entities"] is False
+    assert snapshot["read_only"] is False
+    assert snapshot["exposure"] == {"light.other": False}
+
+
+@pytest.mark.asyncio
+async def test_saved_filter_carries_no_mode_marker_comment(tmp_path: Path) -> None:
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    snapshot = await managed.async_read({"light.one"})
+
+    await managed.async_save(
+        expected_revision=snapshot["revision"],
+        expected_entities_revision=snapshot["entities_revision"],
+        expose_new_entities=True,
+        entities=[{"entity_id": "light.one", "exposed": False}],
+        known_entity_ids={"light.one"},
+    )
+
+    assert (tmp_path / "alexa_exposure_filter.yaml").read_text() == (
+        "# Managed by Alexa Exposure Manager.\nexclude_entities:\n  - light.one\n"
+    )
+
+
+@pytest.mark.asyncio
 async def test_save_is_deterministic_and_preserves_hidden_metadata(
     tmp_path: Path,
 ) -> None:
@@ -67,10 +123,7 @@ async def test_save_is_deterministic_and_preserves_hidden_metadata(
 
     assert result["restart_required"] is True
     assert (tmp_path / "alexa_exposure_filter.yaml").read_text() == (
-        "# Managed by Alexa Exposure Manager.\n"
-        "# alexa_exposure_manager: expose_new_entities=false\n"
-        "include_entities:\n"
-        "  - light.kitchen\n"
+        "# Managed by Alexa Exposure Manager.\ninclude_entities:\n  - light.kitchen\n"
     )
     assert (tmp_path / "alexa_entity_config.yaml").read_text() == (
         "switch.coffee:\n"
@@ -140,9 +193,7 @@ async def test_stale_revision_rejects_both_file_write(tmp_path: Path) -> None:
         )
 
     assert (tmp_path / "alexa_exposure_filter.yaml").read_text() == (
-        "# Managed by Alexa Exposure Manager.\n"
-        "# alexa_exposure_manager: expose_new_entities=false\n"
-        "include_entities: []\n"
+        "# Managed by Alexa Exposure Manager.\ninclude_entities: []\n"
     )
 
 

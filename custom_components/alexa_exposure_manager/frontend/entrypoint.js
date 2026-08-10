@@ -623,6 +623,15 @@ var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	configuredStatus: "Include files configured",
 	revisionStatus: "Configuration revision: {revision}",
 	restartStatus: "Restart required: {value}",
+	validationStatusOk: "Last validation: passed at {at}",
+	validationStatusFailed: "Last validation: failed at {at} — {error}",
+	validationStatusRolledBack: "Last validation: failed at {at}, changes rolled back — {error}",
+	validationStatusRollbackFailed: "Last validation: failed at {at} and rollback did not complete — {error}",
+	validationStatusNone: "Last validation: none recorded",
+	migrationStatus: "Migration: {value}",
+	migrationNotStarted: "not started",
+	migrationPreviewed: "previewed",
+	migrationComplete: "complete",
 	yes: "Yes",
 	no: "No",
 	diagnosticsTitle: "Diagnostics",
@@ -1308,7 +1317,7 @@ var $ = class e extends Z {
         </section>
         <section class="advanced-card">
           <h3>${Q("systemStatus")}</h3>
-          <ul><li>${Q("configuredStatus")}</li><li>${Q("revisionStatus", { revision: this.status?.revision ?? "-" })}</li><li>${Q("restartStatus", { value: this.status?.restart_required ? Q("yes") : Q("no") })}</li></ul>
+          <ul><li>${Q("configuredStatus")}</li><li>${Q("revisionStatus", { revision: this.status?.revision ?? "-" })}</li><li>${Q("restartStatus", { value: this.status?.restart_required ? Q("yes") : Q("no") })}</li><li>${this.renderValidationStatus()}</li><li>${Q("migrationStatus", { value: this.migrationStateLabel() })}</li></ul>
         </section>
         <section class="advanced-card">
           <h3>${Q("diagnosticsTitle")}</h3><p>${Q("diagnosticsBody")}</p>
@@ -1320,6 +1329,30 @@ var $ = class e extends Z {
         </section>
       </div>
     `;
+	}
+	renderValidationStatus() {
+		let e = this.status?.last_validation;
+		if (!e || !e.at) return Q("validationStatusNone");
+		let t = e.at;
+		if (e.ok) return Q("validationStatusOk", { at: t });
+		let n = e.error ?? "";
+		return e.rollback === "failed" ? Q("validationStatusRollbackFailed", {
+			at: t,
+			error: n
+		}) : e.rollback === "complete" ? Q("validationStatusRolledBack", {
+			at: t,
+			error: n
+		}) : Q("validationStatusFailed", {
+			at: t,
+			error: n
+		});
+	}
+	migrationStateLabel() {
+		switch (this.status?.migration_state) {
+			case "complete": return Q("migrationComplete");
+			case "previewed": return Q("migrationPreviewed");
+			default: return Q("migrationNotStarted");
+		}
 	}
 	async runDiagnostics() {
 		if (this.hass) try {

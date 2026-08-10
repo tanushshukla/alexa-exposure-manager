@@ -288,6 +288,9 @@ class AlexaExposureManagerRuntime:
             json.dumps(preview_data, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
         self._migration_previews[token] = preview_data
+        if self._state["migration_state"] == "not_started":
+            self._state["migration_state"] = "previewed"
+            await self._async_save_state()
         preview = await self.transaction.async_preview(
             expose_new_entities=expose_new_entities,
             entities=proposed_entities,

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from . import compatibility
@@ -22,6 +23,9 @@ from .const import (
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+
+# The integration is configured through its config entry only; no YAML keys.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:

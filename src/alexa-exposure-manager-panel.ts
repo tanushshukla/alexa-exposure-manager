@@ -900,7 +900,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         </section>
         <section class="advanced-card">
           <h3>${t("systemStatus")}</h3>
-          <ul><li>${t("configuredStatus")}</li><li>${t("revisionStatus", { revision: this.status?.revision ?? "-" })}</li><li>${t("restartStatus", { value: this.status?.restart_required ? t("yes") : t("no") })}</li></ul>
+          <ul><li>${t("configuredStatus")}</li><li>${t("revisionStatus", { revision: this.status?.revision ?? "-" })}</li><li>${t("restartStatus", { value: this.status?.restart_required ? t("yes") : t("no") })}</li><li>${this.renderValidationStatus()}</li><li>${t("migrationStatus", { value: this.migrationStateLabel() })}</li></ul>
         </section>
         <section class="advanced-card">
           <h3>${t("diagnosticsTitle")}</h3><p>${t("diagnosticsBody")}</p>
@@ -910,6 +910,28 @@ export class AlexaExposureManagerPanel extends LitElement {
         </section>
       </div>
     `;
+  }
+
+  private renderValidationStatus() {
+    const validation = this.status?.last_validation;
+    if (!validation || !validation.at) return t("validationStatusNone");
+    const at = validation.at;
+    if (validation.ok) return t("validationStatusOk", { at });
+    const error = validation.error ?? "";
+    if (validation.rollback === "failed") return t("validationStatusRollbackFailed", { at, error });
+    if (validation.rollback === "complete") return t("validationStatusRolledBack", { at, error });
+    return t("validationStatusFailed", { at, error });
+  }
+
+  private migrationStateLabel() {
+    switch (this.status?.migration_state) {
+      case "complete":
+        return t("migrationComplete");
+      case "previewed":
+        return t("migrationPreviewed");
+      default:
+        return t("migrationNotStarted");
+    }
   }
 
   private async runDiagnostics() {
