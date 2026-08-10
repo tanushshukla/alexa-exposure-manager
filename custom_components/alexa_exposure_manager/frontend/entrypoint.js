@@ -710,13 +710,13 @@ var $ = class e extends Z {
 	};
 	baseExposeNewEntities = !1;
 	dialogTrigger;
-	loadedFor;
+	loadedConnection;
 	static CANDIDATE_WINDOW = 40;
 	constructor() {
 		super(), this.narrow = !1, this.loading = !0, this.error = "", this.query = "", this.staged = {}, this.saving = !1, this.saveError = "", this.exposeNewEntities = !1, this.addDialogOpen = !1, this.addQuery = "", this.addSelection = [], this.selectedEntities = [], this.bulkConfirmOpen = !1, this.bulkAction = "unexpose", this.visibility = "all", this.advancedOpen = !1, this.advancedLoading = !1, this.advancedError = "", this.operationMessage = "", this.migrationLoading = !1, this.validationIssues = [], this.restartBannerDismissed = !1, this.candidateWindowStart = 0;
 	}
 	updated(e) {
-		if (e.has("hass") && this.hass && this.hass !== this.loadedFor && (this.loadedFor = this.hass, this.load()), e.has("confirmation") && this.confirmation || e.has("bulkConfirmOpen") && this.bulkConfirmOpen) {
+		if (e.has("hass") && this.hass && this.hass.connection !== this.loadedConnection && (this.loadedConnection = this.hass.connection, this.load()), e.has("confirmation") && this.confirmation || e.has("bulkConfirmOpen") && this.bulkConfirmOpen) {
 			let e = this.renderRoot.activeElement;
 			e instanceof HTMLElement && (this.dialogTrigger = e), queueMicrotask(() => {
 				this.renderRoot.querySelector("[role='alertdialog'] footer button:last-child")?.focus();

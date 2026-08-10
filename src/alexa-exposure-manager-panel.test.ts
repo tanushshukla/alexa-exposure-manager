@@ -482,6 +482,36 @@ describe("alexa-exposure-manager-panel", () => {
     });
   });
 
+  it("does not reload when hass object identity changes but connection is stable", async () => {
+    const responses = configuredResponses();
+    const connection = {
+      sendMessagePromise: vi.fn((message: Message) => {
+        const response = responses[message.type];
+        return response instanceof Error ? Promise.reject(response) : Promise.resolve(response);
+      }),
+    };
+    const panel = document.createElement("alexa-exposure-manager-panel") as HTMLElement & {
+      hass: { connection: typeof connection };
+      updateComplete: Promise<boolean>;
+    };
+    panel.hass = { connection };
+    document.body.append(panel);
+    await settle(panel);
+    const initialCalls = connection.sendMessagePromise.mock.calls.length;
+    expect(initialCalls).toBeGreaterThan(0);
+
+    panel.hass = { connection };
+    await settle(panel);
+    expect(connection.sendMessagePromise.mock.calls.length).toBe(initialCalls);
+
+    const reconnected = {
+      sendMessagePromise: connection.sendMessagePromise,
+    };
+    panel.hass = { connection: reconnected };
+    await settle(panel);
+    expect(connection.sendMessagePromise.mock.calls.length).toBeGreaterThan(initialCalls);
+  });
+
   it("previews and confirms migration from the setup-only state", async () => {
     const panel = await createPanel({
       "alexa_exposure_manager/status": { configured: false, revision: "setup-r2" },

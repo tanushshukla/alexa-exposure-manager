@@ -90,7 +90,7 @@ export class AlexaExposureManagerPanel extends LitElement {
   declare private candidateWindowStart: number;
   private baseExposeNewEntities = false;
   private dialogTrigger?: HTMLElement;
-  private loadedFor?: HomeAssistant;
+  private loadedConnection?: HomeAssistant["connection"];
   private static readonly CANDIDATE_WINDOW = 40;
 
   constructor() {
@@ -121,8 +121,12 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   protected updated(changed: PropertyValues) {
-    if (changed.has("hass") && this.hass && this.hass !== this.loadedFor) {
-      this.loadedFor = this.hass;
+    if (
+      changed.has("hass") &&
+      this.hass &&
+      this.hass.connection !== this.loadedConnection
+    ) {
+      this.loadedConnection = this.hass.connection;
       void this.load();
     }
     const openedConfirmation =
