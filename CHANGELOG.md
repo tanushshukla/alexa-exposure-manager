@@ -5,22 +5,14 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
-- Multi-category `display_categories` values in the managed YAML now switch the
-  manager to read-only instead of being silently truncated.
-- The panel ships its English strings compiled into the custom panel; Home
-  Assistant has no translation category for custom panel UI.
-- Add dialog shows entity icons, keeps unsupported candidates visible but
-  disabled, and is covered by cancel and mobile tests.
-- Metadata dialog shows Home Assistant name, device, area, and exposure state.
-- Activation accepts quoted includes and directory-include layouts that resolve
-  to the fixed managed paths under `config_dir`.
-- Mode is derived only from the managed filter key; tests cover both switch
-  directions and new-entity defaults.
-- Migration precedence tests cover globs, include-only, and exclude-only filters.
-- README troubleshooting section and Advanced status tests for last validation
-  and migration state.
+## [0.1.1] - 2026-08-10
 
-## [0.1.0] - Unreleased release candidate
+### Fixed
+
+- Panel no longer flickers by reloading on every Home Assistant state update.
+  Data is loaded once per websocket connection and again only after reconnect.
+
+## [0.1.0] - 2026-08-10
 
 ### Added
 
@@ -48,11 +40,6 @@ uses semantic versioning once releases are published.
 - Home Assistant `2026.8.1` with
   `pytest-homeassistant-custom-component==0.13.355`.
 
-### Release Status
-
-No `0.1.0` tag or GitHub release has been created. Publishing remains blocked
-until the production custom integration, backend tests, disposable acceptance
-pass, and Home Assistant OS owner acceptance pass are complete.
-
-[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.1
 [0.1.0]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.0
