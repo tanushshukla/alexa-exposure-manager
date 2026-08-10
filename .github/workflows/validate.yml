@@ -1,0 +1,59 @@
+name: HACS and Home Assistant Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: "23 4 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-artifacts:
+    name: Release artifact syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate release artifact syntax
+        run: scripts/validate-release-artifacts.sh
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Require production integration
+        run: test -f custom_components/alexa_exposure_manager/manifest.json
+
+      - name: Validate HACS repository
+        uses: hacs/action@main
+        with:
+          category: integration
+
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Require production integration
+        run: test -f custom_components/alexa_exposure_manager/manifest.json
+
+      - name: Validate with Hassfest
+        uses: home-assistant/actions/hassfest@master

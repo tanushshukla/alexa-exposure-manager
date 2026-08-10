@@ -1,0 +1,16 @@
+services:
+  homeassistant:
+    image: "ghcr.io/home-assistant/home-assistant:${HA_VERSION:?Set HA_VERSION}"
+    restart: "no"
+    ports:
+      - "${HA_PORT:-8123}:8123"
+    environment:
+      TZ: "UTC"
+    volumes:
+      - type: bind
+        source: "${HA_CONFIG_DIR:?Set HA_CONFIG_DIR}"
+        target: /config
+      - type: bind
+        source: ../../custom_components/alexa_exposure_manager
+        target: /config/custom_components/alexa_exposure_manager
+        read_only: true

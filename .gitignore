@@ -12,4 +12,10 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.venv/
+.acceptance/
 *.pyc
+*.tsbuildinfo
+.acceptance/
+.coverage
+htmlcov/

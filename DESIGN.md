@@ -1,38 +1,80 @@
-# Alexa Exposure Manager Design
+# Alexa Exposure Manager v1 Design Direction
 
-## Personality
+## Canonical Design Basis
 
-Operational, trustworthy, and calm. This is an administrative tool, not a marketing dashboard. Dense information is acceptable when hierarchy and actions remain clear.
+This design follows GitHub issue
+[#12](https://github.com/tanushshukla/alexa-exposure-manager/issues/12). The
+standalone React prototype is historical context only. Its deep navy application
+shell, custom fonts, three-state controls, inherited-rule rows, and editable
+advanced rules are explicitly not the production design.
 
-## Visual Direction
+## Product Character
 
-- Home Assistant-inspired neutral shell with a deep navy sidebar.
-- Warm Alexa blue marks exposed entities and primary actions.
-- Green is reserved for validated/saved states; red is reserved for explicit exclusion and errors.
-- Square-to-soft corners and restrained shadows keep the UI utilitarian.
-- Typography uses `Manrope` for interface text and `IBM Plex Mono` for entity IDs and YAML.
+The panel should feel like a focused Home Assistant administration surface:
+calm, familiar, transparent, and safe. It should reuse Home Assistant's visual
+language and components rather than look like an independent dashboard embedded
+inside Home Assistant.
 
-## Screen Structure
+## Production Structure
 
-1. Persistent navigation/sidebar on desktop, compact top bar on mobile.
-2. Header with status summary and save action.
-3. Overview strip showing exposed, hidden, inherited, and pending counts.
-4. Search and filter toolbar.
-5. Entity workspace with bulk action bar and dense responsive rows.
-6. Context drawer for entity details and Alexa metadata.
-7. Advanced rules and YAML preview as focused secondary views.
+1. A setup-only state shows prerequisites, managed-file status, and exact nested
+   include instructions until activation is verified.
+2. The normal state uses a Home Assistant-style entity table with search,
+   support state, device and area context, and one exposed or hidden state.
+3. **Add entities** opens a searchable, virtualized checklist.
+4. Individual entity dialogs show Home Assistant context and Alexa-specific
+   name, description, and ordered display categories.
+5. A persistent pending-change indicator and save action cover all staged edits.
+6. A restart-required banner offers **Restart Home Assistant** and **Later**.
+7. A collapsed **Advanced** section contains YAML preview, revisions, validation
+   status, backup history, restore, missing entries, and diagnostics.
 
-## Interaction Decisions
+## Interaction Rules
 
-- Exposure is a segmented three-state control: Auto, Expose, Hide.
-- Inherited entities show the matching rule directly in the row.
-- Clicking a row opens details; exposure controls do not require the drawer.
-- Save always performs validation first and never implies an automatic restart.
-- On mobile, table rows become cards and the sidebar becomes a horizontal view switcher.
+- Individual exposure and metadata edits do not require confirmation.
+- Bulk expose and unexpose actions require one count-based confirmation.
+- Restart requires one confirmation.
+- Migration requires a preview and explicit confirmation.
+- Backup restore uses the same guarded workflow as a normal save.
+- Revision conflicts reject the save and require reload. There is no force-save
+  or automatic merge.
+- Unsupported entities remain visible and searchable, but cannot be newly
+  exposed and always show a reason.
+- Missing managed entity IDs remain visible until explicitly removed.
+- Unknown keys, unsupported values, anchors, or custom YAML tags switch the
+  manager to read-only mode instead of discarding data.
+- Alexa metadata is independent of exposure and remains when an entity is hidden.
+- Saving never implies an automatic restart or automatic Alexa discovery.
+
+## Expose New Entities
+
+The UI presents a single setting, not YAML terminology:
+
+- Off: new entities are hidden by default; existing exposed entities are stored
+  in `include_entities`.
+- On: new supported entities are exposed by default; existing hidden entities
+  are stored in `exclude_entities`.
+
+Changing the setting materializes the current entity state before switching the
+managed representation, so existing exposure does not change unexpectedly.
+
+## Responsive Behavior
+
+- Desktop uses the native table density and dialogs familiar to Home Assistant.
+- Tablet preserves table scanning and moves secondary actions as needed.
+- Mobile uses touch-friendly rows or cards without hiding support status,
+  pending changes, or the save action.
+- The Add entities list remains virtualized at every width.
+- Long entity IDs wrap or truncate with an accessible full-value affordance.
 
 ## Accessibility
 
-- All actions are keyboard reachable.
-- Focus rings use the primary accent with sufficient contrast.
-- Color is never the only exposure indicator; labels and icons accompany it.
-- Controls have explicit accessible names and minimum 40px touch targets.
+- Every action is keyboard operable.
+- Dialog focus is trapped and restored correctly.
+- Controls have visible labels, focus treatment, and disabled-state explanations.
+- Color is never the only exposure, support, validation, or error indicator.
+- Touch targets follow Home Assistant component sizing.
+- Status changes use appropriate live-region behavior without excessive
+  announcements.
+- All user-facing strings use Home Assistant translation resources, with English
+  as the initial language.

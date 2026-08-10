@@ -1,0 +1,13 @@
+{
+  "config": {
+    "abort": {
+      "single_instance_allowed": "Only one Alexa Exposure Manager instance is allowed."
+    },
+    "step": {
+      "user": {
+        "description": "The manually configured Alexa Smart Home Skill is required. Alexa Exposure Manager only manages its two dedicated include files.",
+        "title": "Set up Alexa Exposure Manager"
+      }
+    }
+  }
+}

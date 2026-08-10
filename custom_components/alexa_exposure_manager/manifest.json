@@ -1,0 +1,14 @@
+{
+  "domain": "alexa_exposure_manager",
+  "name": "Alexa Exposure Manager",
+  "codeowners": ["@tanushshukla"],
+  "config_flow": true,
+  "dependencies": ["alexa", "frontend", "http", "panel_custom", "websocket_api"],
+  "documentation": "https://github.com/tanushshukla/alexa-exposure-manager",
+  "homeassistant": "2026.6.4",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/tanushshukla/alexa-exposure-manager/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,49 +1,82 @@
-# Alexa Exposure Manager MVP
+# Alexa Exposure Manager v1 Product Specification
 
-## Goal
+## Canonical Source
 
-Give administrators a safe visual editor for the entity filters and per-entity metadata used by Home Assistant's manually configured Alexa Smart Home Skill.
+GitHub issue [#12](https://github.com/tanushshukla/alexa-exposure-manager/issues/12)
+is the approved and canonical v1 specification. If this document, historical
+prototype code, or another repository document conflicts with issue #12, issue
+#12 takes precedence.
+
+The earlier standalone React prototype explored interaction ideas using sample
+data. It is not a product requirement, a Home Assistant frontend architecture,
+or an installable integration. In particular, its three-state exposure model,
+editable domain/glob rules, custom application shell, and simulated save states
+are not part of v1.
+
+## Product Goal
+
+Give Home Assistant administrators a safe, native interface for managing the
+entity exposure and per-entity metadata used by Home Assistant's manually
+configured Amazon Alexa Smart Home Skill.
 
 ## Primary User
 
-A Home Assistant administrator who already runs the manual Alexa integration and currently edits `alexa.smart_home.filter` and `entity_config` in YAML.
+A Home Assistant administrator who has already completed the manual Smart Home
+Skill, AWS Lambda, external HTTPS, and account-linking setup and currently
+manages Alexa exposure in YAML.
 
-## Core Jobs
+## Approved v1 Model
 
-1. See which entities Alexa can currently access.
-2. Understand whether exposure is explicit or inherited from a domain/glob rule.
-3. Explicitly include or exclude one or many entities.
-4. Edit Alexa-facing names and display categories.
-5. Preview generated YAML and validate changes before saving.
+- The integration domain is `alexa_exposure_manager`.
+- Installation is through a public HACS custom repository and setup is through
+  a single-entry Home Assistant config flow.
+- The production frontend is an administrator-only Lit custom panel using Home
+  Assistant components and translation resources.
+- The user owns `configuration.yaml`, the containing Alexa YAML, credentials,
+  and unrelated Alexa features.
+- The integration owns only `alexa_exposure_filter.yaml` and
+  `alexa_entity_config.yaml`.
+- Managed YAML remains the source of truth.
+- Each entity has one exposed or hidden state.
+- **Expose new entities** off uses `include_entities`; on uses
+  `exclude_entities`.
+- Switching modes preserves current effective exposure.
+- Legacy entity, domain, and glob rules can be evaluated with Home Assistant's
+  `EntityFilter` semantics and flattened through a confirmed migration.
+- Advanced domain and glob rule editing is out of scope after migration.
+- Entity support comes from Home Assistant's built-in Alexa adapters, not a
+  separate hardcoded compatibility table.
+- Normal edits are staged and saved together with revisions for both files.
+- Saves use five retained backup versions, atomic replacement, full Home
+  Assistant configuration validation, and two-file rollback.
+- A successful save requires a Home Assistant restart but never triggers one
+  without administrator confirmation.
+- Alexa discovery remains a user action.
+- Default diagnostics are redacted. Full managed YAML requires a separate
+  privacy warning and explicit confirmation.
 
-## MVP Scope
+## Acceptance Seam
 
-- Search entities by name or entity ID.
-- Filter by area, domain, integration, and effective exposure.
-- Show explicit include, explicit exclude, and inherited states.
-- Select entities and apply bulk exposure changes.
-- Edit an entity's Alexa name, description, and display category.
-- Configure include/exclude domains and globs in an advanced rules view.
-- Preview deterministic generated YAML.
-- Simulate validation and save/restart states in the standalone prototype.
+The primary acceptance seam is a disposable running Home Assistant instance.
+It must install the custom integration, create a config entry, load the Lit
+panel, retrieve real registry entities, stage and save exposure changes, run
+full configuration validation, and show restart-required state. Browser checks
+cover desktop and mobile workflows. Focused backend tests cover revision
+conflicts, migration precedence, interrupted writes, backup retention,
+validation failure, rollback, and restore.
 
-## Safety Boundaries
+The final release gate is an owner-run Home Assistant OS pass with real devices,
+areas, entities, backups, restart, and Alexa discovery.
 
-- The production integration will only own dedicated include files.
-- Alexa credentials and the user's main `configuration.yaml` remain outside the app.
-- Write operations must require a Home Assistant administrator.
-- The production backend must use fixed paths, revision hashes, atomic writes, validation, and rollback.
+## Release Support
 
-## Out Of Scope For This Prototype
+Version `0.1.0` supports Home Assistant `2026.6.4`, `2026.7.4`, and `2026.8.1`.
+The matching `pytest-homeassistant-custom-component` versions are `0.13.340`,
+`0.13.348`, and `0.13.355` respectively.
 
-- Direct access to a Home Assistant instance.
-- Reading or writing files under `/config`.
-- Restarting Home Assistant.
-- Importing arbitrary nested YAML structures.
+## Scope Boundary
 
-## Success Criteria
-
-- A user can identify why an entity is exposed without opening YAML.
-- A user can change multiple entities in fewer interactions than manual file editing.
-- The generated YAML accurately reflects the current UI state.
-- The interface works at 375px, 768px, and desktop widths.
+Alexa Exposure Manager does not create or configure Amazon or AWS resources,
+manage Home Assistant Cloud, edit user-owned Alexa YAML, merge concurrent manual
+edits, expose controls to non-administrators, call Amazon APIs, or automatically
+trigger discovery.
