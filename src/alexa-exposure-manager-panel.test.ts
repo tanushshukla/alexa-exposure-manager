@@ -41,6 +41,13 @@ function configuredResponses(): Record<string, unknown> {
       entities_revision: "entities-r9",
       restart_required: false,
       expose_new_entities: false,
+      migration_state: "complete",
+      last_validation: {
+        ok: true,
+        error: null,
+        rollback: null,
+        at: "2026-08-10T12:00:00+00:00",
+      },
     },
     "alexa_exposure_manager/entities": {
       revision: "config-r4",
@@ -218,6 +225,7 @@ describe("alexa-exposure-manager-panel", () => {
     const dialog = root.querySelector<HTMLElement>("[role='dialog']")!;
     expect(dialog.textContent).toContain("Bedroom fan");
     expect(dialog.textContent).not.toContain("Phone battery");
+    expect(dialog.querySelector("ha-icon[icon='mdi:fan']")).not.toBeNull();
 
     root.querySelector<HTMLInputElement>("[aria-label='Select Bedroom fan']")!.click();
     await settle(panel);
@@ -279,6 +287,96 @@ describe("alexa-exposure-manager-panel", () => {
     expect(root.querySelector("[role='alertdialog']")).toBeNull();
   });
 
+  it("cancels bulk confirmation without changing pending configuration", async () => {
+    const panel = await createPanel(configuredResponses());
+    const root = panel.shadowRoot!;
+
+    root.querySelector<HTMLInputElement>("[aria-label='Select Kitchen ceiling for bulk action']")!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>("[aria-label='Unexpose selected entities']")!.click();
+    await settle(panel);
+    const dialog = root.querySelector<HTMLElement>("[role='alertdialog']")!;
+    dialog.querySelectorAll("button")[0]!.click();
+    await settle(panel);
+
+    expect(root.querySelector("[role='alertdialog']")).toBeNull();
+    expect(root.textContent).not.toContain("pending change");
+  });
+
+  it("shows icons and disabled unsupported rows in the Add dialog, and cancels cleanly", async () => {
+    const panel = await createPanel(configuredResponses());
+    const root = panel.shadowRoot!;
+
+    root.querySelector<HTMLButtonElement>("[aria-label='Add entities']")!.click();
+    await settle(panel);
+    const dialog = root.querySelector<HTMLElement>("[role='dialog']")!;
+    expect(dialog.querySelector("ha-icon[icon='mdi:fan']")).not.toBeNull();
+    expect(dialog.textContent).toContain("Phone battery");
+    expect(dialog.textContent).toContain("This domain is not supported by Alexa");
+    const unsupportedCheckbox = dialog.querySelector<HTMLInputElement>(
+      "[aria-label='Select Phone battery']",
+    )!;
+    expect(unsupportedCheckbox.disabled).toBe(true);
+
+    Array.from(dialog.querySelectorAll("button"))
+      .find((button) => button.textContent?.trim() === "Cancel")!
+      .click();
+    await settle(panel);
+    expect(root.querySelector("[role='dialog']")).toBeNull();
+    expect(root.textContent).not.toContain("pending change");
+  });
+
+  it("keeps the catalog usable at mobile width", async () => {
+    const panel = await createPanel(configuredResponses());
+    (panel as HTMLElement & { narrow: boolean }).narrow = true;
+    await settle(panel);
+    const root = panel.shadowRoot!;
+    const main = root.querySelector("main")!;
+    expect(main.classList.contains("narrow")).toBe(true);
+    expect(root.querySelector("[aria-label='Entity search']")).not.toBeNull();
+    expect(root.querySelector("[aria-label='Save changes']")).not.toBeNull();
+    expect(root.textContent).toContain("Kitchen ceiling");
+    expect(root.textContent).toContain("This domain is not supported by Alexa");
+
+    const search = root.querySelector<HTMLInputElement>("[aria-label='Entity search']")!;
+    search.value = "phone";
+    search.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    await settle(panel);
+    expect(root.textContent).toContain("sensor.phone_battery");
+    expect(root.textContent).not.toContain("light.kitchen_ceiling");
+
+    root.querySelector<HTMLButtonElement>("[aria-label='Add entities']")!.click();
+    await settle(panel);
+    expect(root.querySelector("[role='dialog']")).not.toBeNull();
+    expect(root.querySelector("[aria-label='Search entities to add']")).not.toBeNull();
+  });
+
+  it("exposes accessible labels and dialog roles for keyboard and assistive use", async () => {
+    const panel = await createPanel(configuredResponses());
+    const root = panel.shadowRoot!;
+    expect(root.querySelector("[aria-label='Entity search']")).not.toBeNull();
+    expect(root.querySelector("[aria-label='Expose new entities automatically']")).not.toBeNull();
+    expect(root.querySelector("[role='switch']")).not.toBeNull();
+    expect(root.querySelector("[aria-label='Add entities']")).not.toBeNull();
+
+    root.querySelector<HTMLButtonElement>("[aria-label='Edit Alexa metadata for Kitchen ceiling']")!.click();
+    await settle(panel);
+    const metadata = root.querySelector<HTMLElement>("[role='dialog']")!;
+    expect(metadata.getAttribute("aria-modal")).toBe("true");
+    expect(metadata.querySelector("[aria-label='Alexa name']")).not.toBeNull();
+    expect(metadata.querySelector("[aria-label='Close dialog']")).not.toBeNull();
+    metadata.querySelector<HTMLButtonElement>("[aria-label='Close dialog']")!.click();
+    await settle(panel);
+
+    root.querySelector<HTMLInputElement>("[aria-label='Select Kitchen ceiling for bulk action']")!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>("[aria-label='Unexpose selected entities']")!.click();
+    await settle(panel);
+    const confirm = root.querySelector<HTMLElement>("[role='alertdialog']")!;
+    expect(confirm.getAttribute("aria-modal")).toBe("true");
+    expect(confirm.querySelector("[aria-label='Confirm unexpose']")).not.toBeNull();
+  });
+
   it("edits Alexa metadata with inferred and a single display category", async () => {
     const panel = await createPanel(configuredResponses());
     const root = panel.shadowRoot!;
@@ -287,6 +385,11 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
     const dialog = root.querySelector<HTMLElement>("[role='dialog']")!;
     expect(dialog.textContent).toContain("Inferred category: LIGHT");
+    expect(dialog.textContent).toContain("Home Assistant name: Kitchen ceiling");
+    expect(dialog.textContent).toContain("light.kitchen_ceiling");
+    expect(dialog.textContent).toContain("Device: Hue ceiling");
+    expect(dialog.textContent).toContain("Area: Kitchen");
+    expect(dialog.textContent).toContain("Alexa exposure: Exposed");
 
     const name = dialog.querySelector<HTMLInputElement>("[aria-label='Alexa name']")!;
     name.value = "Kitchen voice lights";
@@ -336,6 +439,8 @@ describe("alexa-exposure-manager-panel", () => {
     });
     expect(root.textContent).toContain("include_entities:");
     expect(root.textContent).toContain("backup-7");
+    expect(root.textContent).toContain("Last validation: passed at 2026-08-10T12:00:00+00:00");
+    expect(root.textContent).toContain("Migration: complete");
 
     root.querySelector<HTMLButtonElement>("[aria-label='Run diagnostics']")!.click();
     await settle(panel);

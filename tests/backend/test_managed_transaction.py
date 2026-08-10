@@ -175,6 +175,89 @@ async def test_mode_switch_materializes_existing_exposure_and_keeps_missing_ids(
 
 
 @pytest.mark.asyncio
+async def test_mode_switch_on_to_off_preserves_exposure_and_missing_ids(
+    tmp_path: Path,
+) -> None:
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    initial = await managed.async_read({"light.one", "light.two"})
+    allowlist = await managed.async_save(
+        expected_revision=initial["revision"],
+        expected_entities_revision=initial["entities_revision"],
+        expose_new_entities=False,
+        entities=[
+            {"entity_id": "light.one", "exposed": True},
+            {"entity_id": "light.missing", "exposed": True},
+        ],
+        known_entity_ids={"light.one", "light.two"},
+    )
+    on_mode = await managed.async_save(
+        expected_revision=allowlist["revision"],
+        expected_entities_revision=allowlist["entities_revision"],
+        expose_new_entities=True,
+        entities=[],
+        known_entity_ids={"light.one", "light.two"},
+    )
+
+    switched = await managed.async_save(
+        expected_revision=on_mode["revision"],
+        expected_entities_revision=on_mode["entities_revision"],
+        expose_new_entities=False,
+        entities=[],
+        known_entity_ids={"light.one", "light.two"},
+    )
+
+    assert switched["expose_new_entities"] is False
+    filter_text = (tmp_path / "alexa_exposure_filter.yaml").read_text()
+    assert "include_entities:" in filter_text
+    assert "light.one" in filter_text
+    assert "light.two" not in filter_text
+    snapshot = await managed.async_read({"light.one", "light.two"})
+    assert snapshot["exposure"] == {
+        "light.missing": True,
+        "light.one": True,
+        "light.two": False,
+    }
+    assert snapshot["missing_entity_ids"] == ["light.missing"]
+
+
+@pytest.mark.asyncio
+async def test_new_entity_defaults_follow_expose_new_entities_mode(
+    tmp_path: Path,
+) -> None:
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    allowlist = await managed.async_read({"light.one"})
+    saved_allowlist = await managed.async_save(
+        expected_revision=allowlist["revision"],
+        expected_entities_revision=allowlist["entities_revision"],
+        expose_new_entities=False,
+        entities=[{"entity_id": "light.one", "exposed": True}],
+        known_entity_ids={"light.one"},
+    )
+
+    after_allowlist = await managed.async_read({"light.one", "light.brand_new"})
+    assert after_allowlist["expose_new_entities"] is False
+    assert after_allowlist["exposure"]["light.one"] is True
+    assert after_allowlist["exposure"]["light.brand_new"] is False
+
+    blocklist = await managed.async_save(
+        expected_revision=saved_allowlist["revision"],
+        expected_entities_revision=saved_allowlist["entities_revision"],
+        expose_new_entities=True,
+        entities=[],
+        known_entity_ids={"light.one"},
+    )
+    after_blocklist = await managed.async_read(
+        {"light.one", "light.brand_new", "light.another_new"}
+    )
+    assert blocklist["expose_new_entities"] is True
+    assert after_blocklist["exposure"]["light.one"] is True
+    assert after_blocklist["exposure"]["light.brand_new"] is True
+    assert after_blocklist["exposure"]["light.another_new"] is True
+
+
+@pytest.mark.asyncio
 async def test_stale_revision_rejects_both_file_write(tmp_path: Path) -> None:
     managed = transaction(tmp_path)
     await managed.async_initialize()

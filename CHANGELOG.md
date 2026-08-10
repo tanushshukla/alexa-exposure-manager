@@ -9,6 +9,16 @@ uses semantic versioning once releases are published.
   manager to read-only instead of being silently truncated.
 - The panel ships its English strings compiled into the custom panel; Home
   Assistant has no translation category for custom panel UI.
+- Add dialog shows entity icons, keeps unsupported candidates visible but
+  disabled, and is covered by cancel and mobile tests.
+- Metadata dialog shows Home Assistant name, device, area, and exposure state.
+- Activation accepts quoted includes and directory-include layouts that resolve
+  to the fixed managed paths under `config_dir`.
+- Mode is derived only from the managed filter key; tests cover both switch
+  directions and new-entity defaults.
+- Migration precedence tests cover globs, include-only, and exclude-only filters.
+- README troubleshooting section and Advanced status tests for last validation
+  and migration state.
 
 ## [0.1.0] - Unreleased release candidate
 

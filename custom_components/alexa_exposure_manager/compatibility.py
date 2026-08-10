@@ -50,14 +50,21 @@ def _annotation_includes_managed_file(
                 # Handle !include, !include_dir_list/named/merge variants,
                 # quoted and path-prefixed forms: !include "subdir/file.yaml"
                 match = re.search(
-                    r"!include(?:_dir(?:_(?:list|named|merge_list|merge_named))?)?\s+[\"']?([^\"'\s]+)[\"']?",
+                    r"(!include(?:_dir(?:_(?:list|named|merge_list|merge_named))?)?)\s+[\"']?([^\"'\s]+)[\"']?",
                     line,
                 )
                 if match is None:
                     return False
-                included = match.group(1).strip()
+                include_tag = match.group(1)
+                included = match.group(2).strip()
                 # Relative include paths resolve against the including file's directory.
-                return (Path(source).parent / included).resolve() == managed_path
+                resolved = (Path(source).parent / included).resolve()
+                if resolved == managed_path:
+                    return True
+                # Dir-style includes are active when the managed file lives in that dir.
+                if include_tag.startswith("!include_dir"):
+                    return (resolved / filename).resolve() == managed_path
+                return False
     except OSError:
         return False
     return False

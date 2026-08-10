@@ -57,6 +57,10 @@ The UI presents a single setting, not YAML terminology:
 - On: new supported entities are exposed by default; existing hidden entities
   are stored in `exclude_entities`.
 
+Mode is derived only from which filter key is present in the managed YAML. The
+integration does not write or require a mode marker comment. A hand-edited
+switch between `include_entities` and `exclude_entities` is honored on reload.
+
 Changing the setting materializes the current entity state before switching the
 managed representation, so existing exposure does not change unexpectedly.
 

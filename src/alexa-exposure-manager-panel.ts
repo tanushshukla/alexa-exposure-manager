@@ -575,7 +575,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         .join(" ")
         .toLocaleLowerCase()
         .includes(query);
-      return !exposed && entity.supported && !entity.missing && matches;
+      return !exposed && !entity.missing && matches;
     });
     const windowSize = AlexaExposureManagerPanel.CANDIDATE_WINDOW;
     const start = Math.min(this.candidateWindowStart, Math.max(0, candidates.length - windowSize));
@@ -605,18 +605,34 @@ export class AlexaExposureManagerPanel extends LitElement {
           <div class="candidate-list" @scroll=${(event: Event) => this.onCandidateScroll(event, candidates.length)}>
             ${start > 0 ? html`<div class="virtual-spacer" style=${`height:${start * 56}px`}></div>` : nothing}
             ${visible.length
-              ? visible.map((entity) => html`
-                  <label class="candidate-row">
+              ? visible.map((entity) => {
+                  const disabled = !entity.supported;
+                  return html`
+                  <label class=${`candidate-row${disabled ? " disabled" : ""}`}>
                     <input
                       type="checkbox"
                       aria-label=${t("selectEntity", { name: entity.name })}
                       .checked=${this.addSelection.includes(entity.entityId)}
-                      @change=${() => this.toggleAddSelection(entity.entityId)}
+                      ?disabled=${disabled}
+                      @change=${() => {
+                        if (!disabled) this.toggleAddSelection(entity.entityId);
+                      }}
                     />
-                    <span><strong>${entity.name}</strong><code>${entity.entityId}</code></span>
-                    <small>${entity.deviceName || t("noDevice")} · ${entity.areaName || t("noArea")}</small>
+                    <span class="candidate-main">
+                      <ha-icon icon=${this.iconFor(entity.domain)}></ha-icon>
+                      <span><strong>${entity.name}</strong><code>${entity.entityId}</code></span>
+                    </span>
+                    <small>
+                      ${entity.deviceName || t("noDevice")} · ${entity.areaName || t("noArea")}
+                      ${disabled
+                        ? html`<span class="unsupported-reason">${t("unsupportedCandidate", {
+                            reason: entity.unsupportedReason || t("unsupported"),
+                          })}</span>`
+                        : nothing}
+                    </small>
                   </label>
-                `)
+                `;
+                })
               : html`<div class="empty compact"><strong>${t("noCandidatesTitle")}</strong><span>${t("noCandidatesBody")}</span></div>`}
             ${start + visible.length < candidates.length
               ? html`<div class="virtual-spacer" style=${`height:${(candidates.length - start - visible.length) * 56}px`}></div>`
@@ -754,13 +770,26 @@ export class AlexaExposureManagerPanel extends LitElement {
     const entity = this.normalizedEntities.find((item) => item.entityId === this.metadataEntityId);
     const draft = this.metadataDraft;
     if (!entity || !draft) return nothing;
+    const exposed = draft.exposed;
     return html`
       <div class="dialog-backdrop">
         <section class="dialog metadata-dialog" role="dialog" aria-modal="true" aria-labelledby="metadata-dialog-title" @keydown=${(event: KeyboardEvent) => {
           if (event.key === "Escape") this.closeMetadataDialog();
         }}>
           <header>
-            <div><h2 id="metadata-dialog-title">${t("metadataTitle")}</h2><p>${t("metadataBody")}</p><code>${entity.entityId}</code></div>
+            <div>
+              <h2 id="metadata-dialog-title">${t("metadataTitle")}</h2>
+              <p>${t("metadataBody")}</p>
+              <div class="metadata-context">
+                <strong>${t("haNameLabel", { name: entity.name })}</strong>
+                <code>${entity.entityId}</code>
+                <span>${t("deviceLabel", { device: entity.deviceName || t("noDevice") })}</span>
+                <span>${t("areaLabel", { area: entity.areaName || t("noArea") })}</span>
+                <span class=${exposed ? "exposed" : "hidden"}>${t("exposureStateLabel", {
+                  state: exposed ? t("exposed") : t("hidden"),
+                })}</span>
+              </div>
+            </div>
             <button class="icon" type="button" aria-label=${t("closeDialog")} @click=${this.closeMetadataDialog}><ha-icon icon="mdi:close"></ha-icon></button>
           </header>
           <div class="metadata-content">
@@ -1188,9 +1217,17 @@ export class AlexaExposureManagerPanel extends LitElement {
     .candidate-list { min-height: 180px; overflow-y: auto; border-block: 1px solid var(--divider-color, #e0e0e0); }
     .candidate-row { min-height: 64px; display: grid; grid-template-columns: 24px minmax(190px, 1fr) minmax(150px, .8fr); align-items: center; gap: 12px; padding: 10px 22px; border-bottom: 1px solid var(--divider-color, #e0e0e0); }
     .candidate-row:last-child { border-bottom: 0; }
+    .candidate-row.disabled { opacity: .72; }
     .candidate-row input { width: 18px; min-height: 18px; }
+    .candidate-main { min-width: 0; display: flex; align-items: center; gap: 10px; }
+    .candidate-main ha-icon { color: var(--state-icon-color, var(--secondary-text-color, #616161)); flex: none; }
     .candidate-row strong, .candidate-row code { display: block; }
     .candidate-row code, .candidate-row small { margin-top: 4px; color: var(--secondary-text-color, #616161); font-size: 11px; }
+    .unsupported-reason { display: block; margin-top: 4px; color: var(--warning-color, #f57c00); font-weight: 600; }
+    .metadata-context { display: grid; gap: 4px; margin-top: 10px; }
+    .metadata-context strong, .metadata-context code, .metadata-context span { display: block; font-size: 13px; }
+    .metadata-context .exposed { color: var(--primary-color, #03a9f4); font-weight: 600; }
+    .metadata-context .hidden { color: var(--secondary-text-color, #616161); font-weight: 600; }
     .dialog footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 16px 22px; }
     .dialog footer > span { margin-right: auto; color: var(--secondary-text-color, #616161); font-size: 12px; }
     .confirm-dialog { max-width: 510px; }

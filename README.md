@@ -114,6 +114,23 @@ managed filter is an explicit `exclude_entities` blocklist and new supported
 entities are exposed. Switching modes preserves the effective exposure of all
 existing and explicitly missing entities.
 
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Integration missing after HACS download | Confirm `custom_components/alexa_exposure_manager/manifest.json` exists and restart Home Assistant. |
+| Panel stays in setup-only mode | Add the exact nested includes, run the configuration check, then restart. Editing stays disabled until both managed files are active. |
+| Save reports a revision conflict | Reload the panel. A managed file changed after the page loaded; restage and save again. |
+| Save validation fails | The previous managed pair is restored automatically. Fix the reported Alexa/include problem before restarting. |
+| Entity is unsupported | Support comes from Home Assistant's Alexa adapters. The panel keeps the entity searchable and shows the reason. |
+| Entity is missing | Managed IDs absent from the registry stay visible until you explicitly remove them. |
+| Alexa does not show a saved change | Restart Home Assistant after save, confirm restart-required cleared, then ask Alexa to discover devices. |
+| Editing is read-only | The managed YAML contains anchors, tags, unknown keys, or multi-category lists the manager will not rewrite. Fix YAML, restart, reload. |
+| Need support data | Use redacted diagnostics first. Full managed-YAML export requires an explicit privacy confirmation. |
+
+For full recovery, migration, backup restore, and scope boundaries, see the
+[complete user guide](docs/USER_GUIDE.md).
+
 ## Documentation
 
 - [Complete user guide](docs/USER_GUIDE.md)

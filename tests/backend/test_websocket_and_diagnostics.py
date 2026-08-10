@@ -244,6 +244,125 @@ async def test_status_activation_comes_from_resolved_nested_includes(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "include_line",
+    [
+        '  filter: !include "alexa_exposure_filter.yaml"\n'
+        '  entity_config: !include "alexa_entity_config.yaml"\n',
+        "  filter: !include 'alexa_exposure_filter.yaml'\n"
+        "  entity_config: !include 'alexa_entity_config.yaml'\n",
+    ],
+)
+async def test_status_activation_accepts_quoted_include_forms(
+    tmp_path, include_line
+) -> None:
+    (tmp_path / "configuration.yaml").write_text("alexa: !include alexa.yaml\n")
+    (tmp_path / "alexa.yaml").write_text("smart_home:\n" + include_line)
+    (tmp_path / "alexa_exposure_filter.yaml").write_text("include_entities: []\n")
+    (tmp_path / "alexa_entity_config.yaml").write_text("{}\n")
+    hass = HomeAssistant(str(tmp_path))
+    await async_setup(hass, {})
+
+    class Transaction:
+        last_validation = None
+
+        async def async_read(self):
+            return {
+                "revision": "filter-r1",
+                "entities_revision": "entities-r1",
+                "expose_new_entities": False,
+                "read_only": False,
+                "read_only_reasons": [],
+            }
+
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = hass.data[DOMAIN]["startup_alexa"]
+    runtime.transaction = Transaction()
+    runtime.created_files = {"filter": False, "entity_config": False}
+    runtime._state = {
+        "restart_required": False,
+        "migration_state": "not_started",
+        "last_validation": None,
+    }
+
+    connection = await call_command(
+        websocket_status,
+        runtime,
+        {"id": 8, "type": "alexa_exposure_manager/status"},
+    )
+    await hass.async_stop(force=True)
+
+    status = connection.results[0][1]
+    assert status["configured"] is True
+    assert status["activation"] == {
+        "filter": True,
+        "entity_config": True,
+        "issues": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_status_activation_accepts_include_dir_merge_named(tmp_path) -> None:
+    (tmp_path / "configuration.yaml").write_text("alexa: !include alexa.yaml\n")
+    (tmp_path / "filter_parts").mkdir()
+    (tmp_path / "entity_parts").mkdir()
+    (tmp_path / "filter_parts" / "alexa_exposure_filter.yaml").write_text(
+        "include_entities: []\n"
+    )
+    (tmp_path / "entity_parts" / "alexa_entity_config.yaml").write_text("{}\n")
+    (tmp_path / "alexa.yaml").write_text(
+        "smart_home:\n"
+        "  filter: !include_dir_merge_named filter_parts\n"
+        "  entity_config: !include_dir_merge_named entity_parts\n"
+    )
+    # Managed fixed paths under config_dir must still be the activation target.
+    (tmp_path / "alexa_exposure_filter.yaml").write_text("include_entities: []\n")
+    (tmp_path / "alexa_entity_config.yaml").write_text("{}\n")
+
+    from custom_components.alexa_exposure_manager.compatibility import (
+        _annotation_includes_managed_file,
+    )
+
+    alexa_path = tmp_path / "alexa.yaml"
+    assert (
+        _annotation_includes_managed_file(
+            (str(alexa_path), 2),
+            "alexa_exposure_filter.yaml",
+            tmp_path,
+        )
+        is False
+    )
+    # Dir include is active only when the managed fixed path is inside that dir.
+    (tmp_path / "managed_filters").mkdir()
+    managed_filter = tmp_path / "managed_filters" / "alexa_exposure_filter.yaml"
+    managed_filter.write_text("include_entities: []\n")
+    parent = tmp_path / "parent_alexa.yaml"
+    parent.write_text(
+        "smart_home:\n  filter: !include_dir_merge_named managed_filters\n"
+    )
+    assert (
+        _annotation_includes_managed_file(
+            (str(parent), 2),
+            "alexa_exposure_filter.yaml",
+            tmp_path / "managed_filters",
+        )
+        is True
+    )
+    assert (
+        _annotation_includes_managed_file(
+            (str(parent), 2),
+            "alexa_exposure_filter.yaml",
+            tmp_path,
+        )
+        is False
+    )
+
+
+@pytest.mark.asyncio
 async def test_status_activation_ignores_same_named_file_outside_config_dir(
     tmp_path,
 ) -> None:
@@ -326,6 +445,18 @@ async def test_status_activation_ignores_same_named_file_outside_config_dir(
                 "include_entities": ["light.secret"],
                 "exclude_domains": ["light"],
             },
+            {"exposed": 1, "hidden": 1, "unsupported": 0, "missing": 0},
+        ),
+        (
+            {"include_entity_globs": ["light.*"], "exclude_entities": ["light.secret"]},
+            {"exposed": 1, "hidden": 1, "unsupported": 0, "missing": 0},
+        ),
+        (
+            {"include_entities": ["light.public"]},
+            {"exposed": 1, "hidden": 1, "unsupported": 0, "missing": 0},
+        ),
+        (
+            {"exclude_entities": ["light.secret"]},
             {"exposed": 1, "hidden": 1, "unsupported": 0, "missing": 0},
         ),
     ],

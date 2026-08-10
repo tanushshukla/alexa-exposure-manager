@@ -40,6 +40,8 @@ manages Alexa exposure in YAML.
 - Each entity has one exposed or hidden state.
 - **Expose new entities** off uses `include_entities`; on uses
   `exclude_entities`.
+- Mode is derived purely from the managed filter key (`include_entities` vs
+  `exclude_entities`). No marker comment is required or written.
 - Switching modes preserves current effective exposure.
 - Legacy entity, domain, and glob rules can be evaluated with Home Assistant's
   `EntityFilter` semantics and flattened through a confirmed migration.
