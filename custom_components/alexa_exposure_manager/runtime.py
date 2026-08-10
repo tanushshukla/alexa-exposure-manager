@@ -316,20 +316,17 @@ class AlexaExposureManagerRuntime:
             raise InvalidManagedConfigurationError(
                 "Migration revisions changed; create a new preview"
             )
-        expose_new_entities = message.get(
-            "expose_new_entities", preview["expose_new_entities"]
-        )
-        if not isinstance(expose_new_entities, bool):
-            raise InvalidManagedConfigurationError(
-                "expose_new_entities must be true or false"
+        try:
+            result = await self.transaction.async_save(
+                expected_revision=preview["expected_revision"],
+                expected_entities_revision=preview["expected_entities_revision"],
+                expose_new_entities=preview["expose_new_entities"],
+                entities=preview["entities"],
+                known_entity_ids=preview["known_entity_ids"],
             )
-        result = await self.transaction.async_save(
-            expected_revision=preview["expected_revision"],
-            expected_entities_revision=preview["expected_entities_revision"],
-            expose_new_entities=expose_new_entities,
-            entities=preview["entities"],
-            known_entity_ids=preview["known_entity_ids"],
-        )
+        except Exception:
+            await self._persist_validation_state()  # noqa: TRY302
+            raise
         self._state["migration_state"] = "complete"
         await self._record_restart_required(result)
         return result
@@ -423,6 +420,10 @@ class AlexaExposureManagerRuntime:
         )
         await self._async_save_state()
 
+    async def _persist_validation_state(self) -> None:
+        self._state["last_validation"] = self.transaction.last_validation
+        await self._store.async_save(self._state)
+
     async def _async_save_state(self) -> None:
         await self._store.async_save(self._state)
 
@@ -434,18 +435,16 @@ class AlexaExposureManagerRuntime:
             return False
         restart_revisions = self._state.get("restart_revisions") or {}
         snapshot = await self.transaction.async_read()
-        if (
-            snapshot["revision"] != restart_revisions.get("revision")
-            or snapshot["entities_revision"]
-            != restart_revisions.get("entities_revision")
-        ):
+        if snapshot["revision"] != restart_revisions.get("revision") or snapshot[
+            "entities_revision"
+        ] != restart_revisions.get("entities_revision"):
             return False
         files = await self.transaction.async_support_export()
         from .const import ENTITY_CONFIG_FILENAME, FILTER_FILENAME
 
-        return (
-            yaml.safe_load(files[FILTER_FILENAME]) or {}
-        ) == self.startup_alexa.get("filter", {}) and (
+        return (yaml.safe_load(files[FILTER_FILENAME]) or {}) == self.startup_alexa.get(
+            "filter", {}
+        ) and (
             yaml.safe_load(files[ENTITY_CONFIG_FILENAME]) or {}
         ) == self.startup_alexa.get("entity_config", {})
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -26,10 +27,11 @@ def sanitize_alexa_mapping(value: Any) -> Any:
 def _annotation_includes_managed_file(
     annotation: tuple[str, int | str] | None, filename: str
 ) -> bool:
-    """Return whether a resolved annotation is the managed include or file itself."""
+    """Return whether a resolved annotation resolves to the managed file."""
     if annotation is None:
         return False
     source = str(annotation[0])
+    # HA resolves !include to the included file itself — filename match is sufficient.
     if Path(source).name == filename:
         return True
     if not isinstance(annotation[1], int):
@@ -39,8 +41,16 @@ def _annotation_includes_managed_file(
             for line_number, line in enumerate(file_handle, start=1):
                 if line_number != annotation[1]:
                     continue
-                stripped = " ".join(line.strip().split())
-                return f"!include {filename}" in stripped
+                # Handle !include, !include_dir_list/named/merge variants,
+                # quoted and path-prefixed forms: !include "subdir/file.yaml"
+                match = re.search(
+                    r"!include(?:_dir(?:_(?:list|named|merge_list|merge_named))?)?\s+[\"']?([^\"'\s]+)[\"']?",
+                    line,
+                )
+                if match is None:
+                    return False
+                included = match.group(1).strip()
+                return Path(included).name == filename
     except OSError:
         return False
     return False

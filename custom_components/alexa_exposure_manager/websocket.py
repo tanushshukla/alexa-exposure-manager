@@ -31,9 +31,7 @@ def _runtime(hass):
     domain_data = hass.data.get(DOMAIN) or {}
     runtimes = domain_data.get(DATA_RUNTIME) or {}
     if not runtimes:
-        raise InvalidManagedConfigurationError(
-            "Alexa Exposure Manager is not set up"
-        )
+        raise InvalidManagedConfigurationError("Alexa Exposure Manager is not set up")
     return next(iter(runtimes.values()))
 
 
@@ -125,7 +123,6 @@ async def websocket_migration_preview(hass, connection, msg) -> None:
         vol.Required("token"): str,
         vol.Required("expected_revision"): str,
         vol.Required("expected_entities_revision"): str,
-        vol.Optional("expose_new_entities"): bool,
     }
 )
 @websocket_api.require_admin
