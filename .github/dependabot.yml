@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # typescript-eslint caps its typescript peer range at <6.1.0, so a
+      # TypeScript major bump cannot resolve and breaks `npm ci`. Drop this
+      # entry once typescript-eslint supports the next major.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
