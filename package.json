@@ -1,7 +1,7 @@
 {
   "name": "alexa-exposure-manager",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -12,16 +12,16 @@
   },
   "dependencies": {
     "lit": "^3.3.3",
-    "vite": "latest"
+    "vite": "^8.2.1"
   },
   "devDependencies": {
-    "@eslint/js": "latest",
-    "@types/node": "latest",
-    "eslint": "latest",
-    "globals": "latest",
-    "jsdom": "latest",
-    "typescript": "latest",
-    "typescript-eslint": "latest",
-    "vitest": "latest"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.2.0",
+    "eslint": "^10.8.1",
+    "globals": "^17.9.0",
+    "jsdom": "^30.0.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
   }
 }
