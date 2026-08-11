@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from dataclasses import dataclass
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -37,20 +38,33 @@ EXPECTED_COMMANDS = {
 }
 
 
-@pytest.mark.asyncio
-async def test_alexa_support_uses_home_assistant_adapter_without_false_negative(
-    tmp_path,
+def test_alexa_support_uses_home_assistant_adapter_without_false_negative(
+    monkeypatch,
 ) -> None:
-    from homeassistant.core import State
+    class Adapter:
+        def __init__(self, hass, config, state) -> None:
+            assert hass == "hass"
+            assert config.entity_config == {}
+            assert config.locale == "en-US"
+            self.state = state
 
-    hass = HomeAssistant(str(tmp_path))
+        def interfaces(self):
+            return [object()]
+
+        def default_display_categories(self):
+            return ["LIGHT"]
+
+    entities_module = ModuleType("homeassistant.components.alexa.entities")
+    entities_module.ENTITY_ADAPTERS = {"light": Adapter}
+    monkeypatch.setitem(
+        sys.modules, "homeassistant.components.alexa.entities", entities_module
+    )
 
     supported, reason, categories = alexa_entity_support(
-        hass,
-        State("light.kitchen", "on", {"supported_color_modes": ["onoff"]}),
+        "hass",
+        SimpleNamespace(domain="light", entity_id="light.kitchen"),
         {},
     )
-    await hass.async_stop(force=True)
 
     assert supported is True
     assert reason is None
