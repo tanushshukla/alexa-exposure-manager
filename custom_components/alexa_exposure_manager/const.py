@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "alexa_exposure_manager"
 NAME: Final = "Alexa Exposure Manager"
-VERSION: Final = "0.1.4"
+VERSION: Final = "0.1.5"
 
 FILTER_FILENAME: Final = "alexa_exposure_filter.yaml"
 ENTITY_CONFIG_FILENAME: Final = "alexa_entity_config.yaml"

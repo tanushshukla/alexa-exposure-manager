@@ -200,7 +200,10 @@ describe("alexa-exposure-manager-panel", () => {
     const text = panel.shadowRoot!.textContent!;
     expect(text).toContain("No previous Alexa configuration was captured");
     expect(text).toContain("restore the old inline filter from a backup");
-    expect(text).toContain("start fresh using the exposure controls below");
+    expect(text).toContain(
+      "activate the managed includes shown above, restart Home Assistant, then configure exposure in the manager",
+    );
+    expect(text).not.toContain("exposure controls below");
     expect(panel.shadowRoot!.querySelector("[aria-label='Preview existing Alexa configuration']")).toBeNull();
   });
 
@@ -268,7 +271,10 @@ describe("alexa-exposure-manager-panel", () => {
     expect(text).toContain("No previous Alexa configuration was captured");
     expect(text).toContain("Alexa cannot reconstruct previous YAML rules from its device list");
     expect(text).toContain("restore the old inline filter from a backup");
-    expect(text).toContain("start fresh using the exposure controls below");
+    expect(text).toContain(
+      "activate the managed includes if needed, restart Home Assistant, then configure exposure in the manager",
+    );
+    expect(text).not.toContain("exposure controls below");
   });
 
   it("keeps configured migration errors visible without replacing the manager", async () => {

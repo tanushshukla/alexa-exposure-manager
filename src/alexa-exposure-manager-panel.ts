@@ -239,7 +239,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         ${this.status?.migration_available === false
           ? html`<div class="setup-source-note">
               <strong>${t("migrationMissingTitle")}</strong>
-              <span>${t("migrationMissingBody")}</span>
+              <span>${t("migrationMissingSetupBody")}</span>
             </div>`
           : nothing}
         ${this.status?.migration_available !== false

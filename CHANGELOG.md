@@ -5,6 +5,15 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-08-11
+
+### Fixed
+
+- The no-migration-source message no longer promises exposure controls below
+  the setup card. It now tells unconfigured users to activate the displayed
+  managed includes, restart Home Assistant, and then configure exposure in the
+  manager.
+
 ## [0.1.4] - 2026-08-11
 
 ### Added
@@ -98,7 +107,8 @@ uses semantic versioning once releases are published.
 - Home Assistant `2026.8.1` with
   `pytest-homeassistant-custom-component==0.13.355`.
 
-[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.5
 [0.1.4]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.4
 [0.1.3]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.3
 [0.1.2]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.2

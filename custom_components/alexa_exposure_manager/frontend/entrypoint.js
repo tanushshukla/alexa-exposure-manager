@@ -666,7 +666,8 @@ var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	migrationReadyTitle: "Existing Alexa configuration is ready to import",
 	migrationReadyBody: "A copy captured before the managed includes became active is still available.",
 	migrationMissingTitle: "No previous Alexa configuration was captured",
-	migrationMissingBody: "Alexa cannot reconstruct previous YAML rules from its device list. If you had old domain, glob, entity, or metadata rules, restore the old inline filter from a backup and restart Home Assistant. Otherwise, start fresh using the exposure controls below.",
+	migrationMissingSetupBody: "Alexa cannot reconstruct previous YAML rules from its device list. If you had old domain, glob, entity, or metadata rules, restore the old inline filter from a backup and restart Home Assistant. Otherwise, activate the managed includes shown above, restart Home Assistant, then configure exposure in the manager.",
+	migrationMissingBody: "Alexa cannot reconstruct previous YAML rules from its device list. If you had old domain, glob, entity, or metadata rules, restore the old inline filter from a backup and restart Home Assistant. Otherwise, activate the managed includes if needed, restart Home Assistant, then configure exposure in the manager.",
 	migrationUnavailable: "No existing Alexa configuration is available to import.",
 	migrationSummary: "{exposed} exposed, {hidden} hidden, {unsupported} unsupported, and {missing} missing entities will be imported.",
 	migrationSourceSnapshot: "Read from the Alexa configuration captured on {captured}, before the managed include files were activated.",
@@ -799,7 +800,7 @@ var $ = class e extends Z {
         <p class="safety">${Q("setupSafety")}</p>
         ${this.status?.migration_available === !1 ? B`<div class="setup-source-note">
               <strong>${Q("migrationMissingTitle")}</strong>
-              <span>${Q("migrationMissingBody")}</span>
+              <span>${Q("migrationMissingSetupBody")}</span>
             </div>` : H}
         ${this.status?.migration_available === !1 ? H : B`<div class="migration">
               <p>${Q("migrationBody")}</p>
