@@ -66,7 +66,7 @@ const english = {
   recoveryEyebrow: "Migration ready",
   recoveryTitle: "The managed files now exist",
   recoveryBody:
-    "Retry does not migrate your existing Alexa configuration. Complete these steps once, in order.",
+    "They are intentionally empty until you import your existing Alexa configuration. Retry does not migrate your existing Alexa configuration. Complete these steps once, in order.",
   recoveryKeepInline: "Keep your current inline filter in alexa.yaml.",
   recoveryPreview: "Select Preview existing Alexa configuration and review the counts.",
   recoveryImport: "Select Import existing Alexa configuration and confirm the migration.",

@@ -146,7 +146,11 @@ async def async_resolved_alexa_config(hass) -> dict[str, Any]:
         "entity_config": entity_config if isinstance(entity_config, dict) else {},
         "filter_active": filter_active,
         "entity_config_active": entity_active,
-        "legacy_source_available": not filter_active and not entity_active,
+        "legacy_source_available": bool(
+            not filter_active
+            and not entity_active
+            and ("filter" in smart_home or "entity_config" in smart_home)
+        ),
         "issues": issues,
     }
 

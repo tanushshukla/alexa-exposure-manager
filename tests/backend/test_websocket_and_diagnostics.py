@@ -107,6 +107,171 @@ async def test_empty_inline_alexa_configuration_is_captured_for_migration() -> N
     }
 
 
+@pytest.mark.asyncio
+async def test_empty_recreated_files_reopen_migration_for_inline_alexa_config(
+    tmp_path, monkeypatch
+) -> None:
+    """A stale completed flag must not strand recovery after managed-file deletion."""
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    (tmp_path / "configuration.yaml").write_text("alexa: !include alexa.yaml\n")
+    (tmp_path / "alexa.yaml").write_text(
+        "smart_home:\n"
+        "  endpoint: https://api.amazonalexa.com/v3/events\n"
+        "  filter:\n"
+        "    include_entities:\n"
+        "      - script.find_shield_remote\n"
+    )
+    hass = HomeAssistant(str(tmp_path))
+    await async_setup(hass, {})
+    (tmp_path / "alexa_exposure_filter.yaml").write_text("include_entities: []\n")
+    (tmp_path / "alexa_entity_config.yaml").write_text("{}\n")
+
+    async def valid_config(_hass):
+        return None
+
+    def entity_catalog(_hass, _entity_config):
+        return [
+            {
+                "entity_id": "script.find_shield_remote",
+                "supported": True,
+                "missing": False,
+                "default_exposed": True,
+                "display_categories": ["ACTIVITY_TRIGGER"],
+            }
+        ]
+
+    from custom_components.alexa_exposure_manager import compatibility
+
+    monkeypatch.setattr(compatibility, "async_validate_full_config", valid_config)
+    monkeypatch.setattr(compatibility, "entity_catalog", entity_catalog)
+
+    runtime = AlexaExposureManagerRuntime(
+        hass,
+        SimpleNamespace(entry_id="entry-1"),
+        hass.data[DOMAIN]["startup_alexa"],
+    )
+    await runtime._store.async_save(
+        {
+            "restart_required": False,
+            "restart_revisions": None,
+            "migration_state": "complete",
+            "last_validation": None,
+        }
+    )
+
+    await runtime.async_initialize()
+    status = await runtime.async_status()
+    preview = await runtime.async_migration_preview()
+    result = await runtime.async_migration_confirm(
+        {
+            "token": preview["token"],
+            "expected_revision": preview["revision"],
+            "expected_entities_revision": preview["entities_revision"],
+        }
+    )
+    await hass.async_stop(force=True)
+
+    assert runtime.startup_alexa["legacy_source_available"] is True
+    assert runtime._state["legacy_snapshot"]["filter"] == {
+        "include_entities": ["script.find_shield_remote"]
+    }
+    assert status["configured"] is False
+    assert status["migration_available"] is True
+    assert preview["counts"]["exposed"] == 1
+    assert "script.find_shield_remote" in preview["filter_yaml"]
+    assert result["migration_state"] == "complete"
+    assert (
+        "script.find_shield_remote"
+        in (tmp_path / "alexa_exposure_filter.yaml").read_text()
+    )
+    assert runtime._state["migration_source_fingerprint"]
+
+
+@pytest.mark.asyncio
+async def test_completed_empty_migration_does_not_reopen_on_every_restart() -> None:
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    legacy_filter = {"include_entities": ["select.unsupported"]}
+
+    class Transaction:
+        async def async_read(self):
+            return {
+                "expose_new_entities": False,
+                "exposure": {},
+                "entity_config": {},
+                "read_only": False,
+            }
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = {
+        "filter": legacy_filter,
+        "entity_config": {},
+        "filter_active": False,
+        "legacy_source_available": True,
+    }
+    runtime.transaction = Transaction()
+    runtime.created_files = {"filter": False, "entity_config": False}
+    runtime._state = {
+        "migration_state": "complete",
+        "migration_source_fingerprint": runtime._legacy_source_fingerprint(
+            legacy_filter, {}
+        ),
+    }
+
+    await runtime._async_capture_legacy_snapshot()
+
+    assert runtime._state["migration_state"] == "complete"
+    assert "legacy_snapshot" not in runtime._state
+
+
+@pytest.mark.asyncio
+async def test_read_only_managed_files_are_not_treated_as_empty_recovery() -> None:
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    class Transaction:
+        last_validation = None
+
+        async def async_read(self):
+            return {
+                "revision": "filter-r1",
+                "entities_revision": "entities-r1",
+                "expose_new_entities": False,
+                "exposure": {},
+                "entity_config": {},
+                "read_only": True,
+                "read_only_reasons": ["unsupported YAML"],
+            }
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = {
+        "filter": {"include_entities": ["light.kitchen"]},
+        "entity_config": {},
+        "filter_active": False,
+        "entity_config_active": False,
+        "legacy_source_available": True,
+        "issues": [],
+    }
+    runtime.transaction = Transaction()
+    runtime.created_files = {"filter": False, "entity_config": False}
+    runtime._state = {
+        "restart_required": False,
+        "migration_state": "complete",
+    }
+
+    await runtime._async_capture_legacy_snapshot()
+    status = await runtime.async_status()
+
+    assert runtime._state["migration_state"] == "complete"
+    assert status["managed_files"]["safe_defaults"] is False
+
+
 @dataclass
 class User:
     is_admin: bool

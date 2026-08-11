@@ -5,6 +5,20 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-11
+
+### Fixed
+
+- Recovery now reopens migration when a previous import is recorded as complete
+  but the managed files are empty and the current inline Alexa configuration
+  still contains filter or entity metadata rules. This also repairs upgrades
+  where an earlier release already recreated the empty files.
+- A legacy migration source is now reported only when `smart_home.filter` or
+  `smart_home.entity_config` is explicitly present, rather than for an Alexa
+  configuration containing credentials or locale settings alone.
+- The recovery view now explains that managed files remain intentionally empty
+  until the inline Alexa configuration is previewed and imported.
+
 ## [0.1.5] - 2026-08-11
 
 ### Fixed
@@ -107,7 +121,8 @@ uses semantic versioning once releases are published.
 - Home Assistant `2026.8.1` with
   `pytest-homeassistant-custom-component==0.13.355`.
 
-[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.6
 [0.1.5]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.5
 [0.1.4]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.4
 [0.1.3]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.3

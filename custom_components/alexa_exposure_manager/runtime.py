@@ -72,15 +72,34 @@ class AlexaExposureManagerRuntime:
         configuration. Re-capture on every startup until activation freezes the
         last good copy, which is what migration must flatten.
         """
-        if self._state["migration_state"] == "complete":
-            return
         if self.startup_alexa.get("filter_active"):
             return
         if not self.startup_alexa.get("legacy_source_available", True):
             return
         legacy_filter = self.startup_alexa.get("filter") or {}
         legacy_metadata = self.startup_alexa.get("entity_config") or {}
+        legacy_fingerprint = self._legacy_source_fingerprint(
+            legacy_filter, legacy_metadata
+        )
         managed = await self.transaction.async_read()
+        if self._state["migration_state"] == "complete":
+            stale_completion = bool(
+                (legacy_filter or legacy_metadata)
+                and not managed["read_only"]
+                and not managed["expose_new_entities"]
+                and not managed.get("exposure")
+                and not managed.get("entity_config")
+                and (
+                    self._state.get("migration_source_fingerprint")
+                    != legacy_fingerprint
+                    or any(self.created_files.values())
+                )
+            )
+            if not stale_completion:
+                return
+            self._state["migration_state"] = "not_started"
+            self._state.pop("migration_source_fingerprint", None)
+            self._state.pop("legacy_snapshot", None)
         self._state["legacy_snapshot"] = {
             "filter": legacy_filter,
             "entity_config": legacy_metadata,
@@ -91,6 +110,19 @@ class AlexaExposureManagerRuntime:
             },
         }
         await self._async_save_state()
+
+    @staticmethod
+    def _legacy_source_fingerprint(
+        legacy_filter: Mapping[str, Any], legacy_metadata: Mapping[str, Any]
+    ) -> str:
+        """Identify the inline source used for a completed migration."""
+        return hashlib.sha256(
+            json.dumps(
+                {"filter": legacy_filter, "entity_config": legacy_metadata},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
 
     @staticmethod
     def _require_fresh_snapshot(
@@ -155,7 +187,8 @@ class AlexaExposureManagerRuntime:
             and self.startup_alexa.get("entity_config_active")
         )
         safe_defaults = bool(
-            not snapshot["expose_new_entities"]
+            not snapshot["read_only"]
+            and not snapshot["expose_new_entities"]
             and not snapshot.get("exposure")
             and not snapshot.get("entity_config")
         )
@@ -392,6 +425,9 @@ class AlexaExposureManagerRuntime:
             "expose_new_entities": expose_new_entities,
             "entities": proposed_entities,
             "known_entity_ids": sorted(current_ids),
+            "legacy_source_fingerprint": self._legacy_source_fingerprint(
+                legacy_filter, legacy_metadata
+            ),
         }
         token = hashlib.sha256(
             json.dumps(preview_data, sort_keys=True, separators=(",", ":")).encode()
@@ -443,6 +479,9 @@ class AlexaExposureManagerRuntime:
             await self._persist_validation_state()  # noqa: TRY302
             raise
         self._state["migration_state"] = "complete"
+        self._state["migration_source_fingerprint"] = preview[
+            "legacy_source_fingerprint"
+        ]
         await self._record_restart_required(result)
         result["migration_state"] = "complete"
         result["migration_available"] = False

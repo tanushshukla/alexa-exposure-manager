@@ -181,6 +181,7 @@ describe("alexa-exposure-manager-panel", () => {
 
     const text = panel.shadowRoot!.textContent!;
     expect(text).toContain("The managed files now exist");
+    expect(text).toContain("They are intentionally empty until you import");
     expect(text).toContain("Retry does not migrate your existing Alexa configuration");
     expect(text).toContain("Keep your current inline filter in alexa.yaml");
     expect(text).toContain("Preview existing Alexa configuration");
