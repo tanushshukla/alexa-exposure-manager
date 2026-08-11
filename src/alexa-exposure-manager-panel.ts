@@ -167,7 +167,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       this.baseExposeNewEntities = this.entitiesResponse.expose_new_entities ?? this.status.expose_new_entities ?? false;
       this.exposeNewEntities = this.baseExposeNewEntities;
     } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error);
+      this.error = this.errorMessage(error);
     } finally {
       this.loading = false;
     }
@@ -905,7 +905,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       this.previewResponse = preview ?? {};
       this.backupsResponse = backups ?? {};
     } catch (error) {
-      this.advancedError = error instanceof Error ? error.message : String(error);
+      this.advancedError = this.errorMessage(error);
     } finally {
       this.advancedLoading = false;
     }
@@ -973,7 +973,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     try {
       this.diagnosticsResponse = await this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/diagnostics" });
     } catch (error) {
-      this.advancedError = error instanceof Error ? error.message : String(error);
+      this.advancedError = this.errorMessage(error);
     }
   }
 
@@ -1039,7 +1039,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         this.status = { ...this.status, ...response };
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.errorMessage(error);
       if (this.isConfigured()) this.advancedError = message;
       else this.error = message;
     }
@@ -1064,7 +1064,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     try {
       this.migrationPreviewResponse = await this.hass.connection.sendMessagePromise<Record<string, unknown>>({ type: "alexa_exposure_manager/migration/preview" });
     } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error);
+      this.error = this.errorMessage(error);
     } finally {
       this.migrationLoading = false;
     }

@@ -733,7 +733,7 @@ var $ = class e extends Z {
 				let [e, t] = await Promise.all([this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/status" }), this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/entities" })]);
 				this.status = e ?? {}, this.entitiesResponse = Array.isArray(t) ? { entities: t } : t ?? {}, this.baseExposeNewEntities = this.entitiesResponse.expose_new_entities ?? this.status.expose_new_entities ?? !1, this.exposeNewEntities = this.baseExposeNewEntities;
 			} catch (e) {
-				this.error = e instanceof Error ? e.message : String(e);
+				this.error = this.errorMessage(e);
 			} finally {
 				this.loading = !1;
 			}
@@ -1321,7 +1321,7 @@ var $ = class e extends Z {
 				let [e, t] = await Promise.all([this.hass.connection.sendMessagePromise(this.previewMessage()), this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/backups" })]);
 				this.previewResponse = e ?? {}, this.backupsResponse = t ?? {};
 			} catch (e) {
-				this.advancedError = e instanceof Error ? e.message : String(e);
+				this.advancedError = this.errorMessage(e);
 			} finally {
 				this.advancedLoading = !1;
 			}
@@ -1390,7 +1390,7 @@ var $ = class e extends Z {
 		if (this.hass) try {
 			this.diagnosticsResponse = await this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/diagnostics" });
 		} catch (e) {
-			this.advancedError = e instanceof Error ? e.message : String(e);
+			this.advancedError = this.errorMessage(e);
 		}
 	}
 	renderOperationConfirmation() {
@@ -1448,7 +1448,7 @@ var $ = class e extends Z {
 				};
 			}
 		} catch (e) {
-			let t = e instanceof Error ? e.message : String(e);
+			let t = this.errorMessage(e);
 			this.isConfigured() ? this.advancedError = t : this.error = t;
 		}
 	}
@@ -1464,7 +1464,7 @@ var $ = class e extends Z {
 			try {
 				this.migrationPreviewResponse = await this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/migration/preview" });
 			} catch (e) {
-				this.error = e instanceof Error ? e.message : String(e);
+				this.error = this.errorMessage(e);
 			} finally {
 				this.migrationLoading = !1;
 			}

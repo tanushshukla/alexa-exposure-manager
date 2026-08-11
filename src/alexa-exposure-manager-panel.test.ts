@@ -512,6 +512,28 @@ describe("alexa-exposure-manager-panel", () => {
     expect(connection.sendMessagePromise.mock.calls.length).toBeGreaterThan(initialCalls);
   });
 
+  it("shows the Home Assistant error message when loading fails", async () => {
+    const panel = document.createElement("alexa-exposure-manager-panel") as HTMLElement & {
+      hass: unknown;
+      updateComplete: Promise<boolean>;
+    };
+    // Home Assistant rejects with a plain object, not an Error instance.
+    panel.hass = {
+      connection: {
+        sendMessagePromise: vi.fn().mockRejectedValue({
+          code: "invalid_configuration",
+          message: "alexa.smart_home.filter is not loaded",
+        }),
+      },
+    };
+    document.body.append(panel);
+    await settle(panel as never);
+
+    const text = panel.shadowRoot!.textContent!;
+    expect(text).toContain("alexa.smart_home.filter is not loaded");
+    expect(text).not.toContain("[object Object]");
+  });
+
   it("shows that migration reads the configuration captured before activation", async () => {
     const panel = await createPanel({
       "alexa_exposure_manager/status": { configured: false, revision: "setup-r2" },
