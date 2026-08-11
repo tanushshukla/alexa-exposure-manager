@@ -10,7 +10,7 @@ from custom_components.alexa_exposure_manager import async_setup_entry
 from custom_components.alexa_exposure_manager.config_flow import (
     AlexaExposureManagerConfigFlow,
 )
-from custom_components.alexa_exposure_manager.const import DOMAIN
+from custom_components.alexa_exposure_manager.const import DOMAIN, VERSION
 
 ROOT = Path(__file__).parents[2]
 
@@ -23,7 +23,9 @@ def test_manifest_declares_installable_single_config_flow_integration() -> None:
     assert manifest["domain"] == "alexa_exposure_manager"
     assert manifest["name"] == "Alexa Exposure Manager"
     assert manifest["config_flow"] is True
-    assert manifest["version"] == "0.1.0"
+    # HACS installs from manifest.json while diagnostics report const.VERSION;
+    # a release that bumps one and not the other ships mismatched versions.
+    assert manifest["version"] == VERSION
     assert "homeassistant" not in manifest
     assert manifest["codeowners"] == ["@tanushshukla"]
 

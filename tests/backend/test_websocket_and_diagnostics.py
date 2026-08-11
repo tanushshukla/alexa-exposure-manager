@@ -651,3 +651,244 @@ async def test_empty_filter_migration_uses_default_exposed_semantics() -> None:
         "unsupported": 0,
         "missing": 0,
     }
+
+
+@pytest.mark.asyncio
+async def test_migration_does_not_propose_alexa_unsupported_entities() -> None:
+    """Alexa can never discover an unsupported entity, and a normal save rejects it."""
+
+    class Transaction:
+        async def async_preview(self, **kwargs):
+            self.proposed = kwargs["entities"]
+            return {
+                "revision": "filter-r1",
+                "entities_revision": "entities-r1",
+                "filter_yaml": "preview-filter",
+                "entity_config_yaml": "preview-entities",
+            }
+
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = {
+        "filter": {"exclude_domains": ["sensor"]},
+        "entity_config": {},
+    }
+    transaction = Transaction()
+    runtime.transaction = transaction
+    runtime._migration_previews = {}
+    runtime._state = {"restart_required": False, "migration_state": "not_started"}
+
+    async def _async_save_state():
+        return None
+
+    runtime._async_save_state = _async_save_state
+
+    async def async_entities():
+        return {
+            "revision": "filter-r1",
+            "entities_revision": "entities-r1",
+            "entities": [
+                {
+                    "entity_id": "light.public",
+                    "supported": True,
+                    "missing": False,
+                    "default_exposed": True,
+                },
+                {
+                    "entity_id": "select.thermostat_mode",
+                    "supported": False,
+                    "missing": False,
+                    "default_exposed": True,
+                },
+            ],
+        }
+
+    runtime.async_entities = async_entities
+    connection = await call_command(
+        websocket_migration_preview,
+        runtime,
+        {"id": 9, "type": "alexa_exposure_manager/migration/preview"},
+    )
+
+    counts = connection.results[0][1]["counts"]
+    assert counts["unsupported"] == 1
+    proposed = {entity["entity_id"] for entity in transaction.proposed}
+    assert "select.thermostat_mode" not in proposed
+    assert "light.public" in proposed
+
+
+def _migration_runtime(startup_alexa, catalog, state=None):
+    """Build a runtime with stubbed storage for migration preview tests."""
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    class Transaction:
+        async def async_preview(self, **kwargs):
+            self.proposed = kwargs["entities"]
+            self.expose_new_entities = kwargs["expose_new_entities"]
+            return {
+                "revision": "filter-r1",
+                "entities_revision": "entities-r1",
+                "filter_yaml": "preview-filter",
+                "entity_config_yaml": "preview-entities",
+            }
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = startup_alexa
+    runtime.transaction = Transaction()
+    runtime._migration_previews = {}
+    runtime._state = state or {
+        "restart_required": False,
+        "migration_state": "not_started",
+    }
+
+    async def _async_save_state():
+        return None
+
+    async def async_entities():
+        return {
+            "revision": "filter-r1",
+            "entities_revision": "entities-r1",
+            "entities": catalog,
+        }
+
+    runtime._async_save_state = _async_save_state
+    runtime.async_entities = async_entities
+    return runtime
+
+
+@pytest.mark.asyncio
+async def test_missing_entity_defaults_to_exposed_under_an_empty_legacy_filter() -> (
+    None
+):
+    """Mirror homeassistant.components.alexa.smart_home.AlexaConfig.should_expose.
+
+    With an empty filter HA falls back to the entity registry, and an entity with
+    no registry entry yields ``auxiliary_entity = False`` -> exposed. A missing ID
+    has no registry entry, so migration must treat it as exposed.
+    """
+    runtime = _migration_runtime(
+        {"filter": {}, "entity_config": {"light.removed_last_year": {"name": "Old"}}},
+        [
+            {
+                "entity_id": "light.live",
+                "supported": True,
+                "missing": False,
+                "default_exposed": True,
+            }
+        ],
+    )
+
+    connection = await call_command(
+        websocket_migration_preview,
+        runtime,
+        {"id": 20, "type": "alexa_exposure_manager/migration/preview"},
+    )
+
+    assert connection.results[0][1]["counts"]["missing"] == 1
+    proposed = {e["entity_id"]: e["exposed"] for e in runtime.transaction.proposed}
+    assert proposed["light.removed_last_year"] is True
+
+
+@pytest.mark.asyncio
+async def test_migration_reads_the_pre_activation_snapshot_not_the_managed_file() -> (
+    None
+):
+    """After activation the live filter IS the managed file; do not read it."""
+    runtime = _migration_runtime(
+        {
+            "filter": {"include_entities": []},
+            "entity_config": {},
+            "filter_active": True,
+            "entity_config_active": True,
+        },
+        [
+            {
+                "entity_id": "light.kept",
+                "supported": True,
+                "missing": False,
+                "default_exposed": True,
+            },
+            {
+                "entity_id": "light.dropped",
+                "supported": True,
+                "missing": False,
+                "default_exposed": True,
+            },
+        ],
+        state={
+            "restart_required": False,
+            "migration_state": "not_started",
+            "legacy_snapshot": {
+                "filter": {"include_entities": ["light.kept"]},
+                "entity_config": {"light.kept": {"name": "Kept"}},
+                "captured_at": "2026-08-09T10:00:00+00:00",
+            },
+        },
+    )
+
+    connection = await call_command(
+        websocket_migration_preview,
+        runtime,
+        {"id": 21, "type": "alexa_exposure_manager/migration/preview"},
+    )
+
+    result = connection.results[0][1]
+    assert result["counts"] == {
+        "exposed": 1,
+        "hidden": 1,
+        "unsupported": 0,
+        "missing": 0,
+    }
+    assert result["legacy_source"]["from_snapshot"] is True
+    assert result["legacy_source"]["captured_at"] == "2026-08-09T10:00:00+00:00"
+    proposed = {e["entity_id"]: e["exposed"] for e in runtime.transaction.proposed}
+    assert proposed == {"light.kept": True, "light.dropped": False}
+
+
+@pytest.mark.asyncio
+async def test_migration_refuses_a_snapshot_older_than_the_managed_files() -> None:
+    """Managed edits made after capture would be overwritten by a stale import."""
+    runtime = _migration_runtime(
+        {
+            "filter": {"include_entities": []},
+            "entity_config": {},
+            "filter_active": True,
+            "entity_config_active": True,
+        },
+        [
+            {
+                "entity_id": "light.kept",
+                "supported": True,
+                "missing": False,
+                "default_exposed": True,
+            }
+        ],
+        state={
+            "restart_required": False,
+            "migration_state": "not_started",
+            "legacy_snapshot": {
+                "filter": {"include_entities": ["light.kept"]},
+                "entity_config": {},
+                "captured_at": "2026-08-09T10:00:00+00:00",
+                "managed_revisions": {
+                    "revision": "filter-r0",
+                    "entities_revision": "entities-r0",
+                },
+            },
+        },
+    )
+
+    connection = await call_command(
+        websocket_migration_preview,
+        runtime,
+        {"id": 22, "type": "alexa_exposure_manager/migration/preview"},
+    )
+
+    assert connection.results == []
+    assert connection.errors[0][1] == "invalid_configuration"
+    assert "2026-08-09" in connection.errors[0][2]

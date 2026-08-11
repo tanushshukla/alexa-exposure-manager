@@ -197,6 +197,8 @@ const english = {
   migrationBody: "If Alexa is already configured in YAML, preview a safe import into the manager-owned include files.",
   migrationUnavailable: "No existing Alexa configuration is available to import.",
   migrationSummary: "{exposed} exposed, {hidden} hidden, {unsupported} unsupported, and {missing} missing entities will be imported.",
+  migrationSourceSnapshot: "Read from the Alexa configuration captured on {captured}, before the managed include files were activated.",
+  migrationSourceLive: "Read from your current Alexa configuration.",
   migrationImport: "Import existing Alexa configuration",
   migrationConfirmTitle: "Import existing Alexa configuration?",
   migrationConfirmBody: "The manager will create its dedicated include files from the preview. Alexa credentials and unrelated YAML are not changed.",

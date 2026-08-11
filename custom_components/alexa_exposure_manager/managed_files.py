@@ -563,10 +563,12 @@ class ManagedFileTransaction:
             if metadata or entity_id in entity_config:
                 entity_config[entity_id] = metadata
 
-        if expose_new_entities != parsed.expose_new_entities:
-            for entity_id in (
-                parsed.configured_entity_ids - known_entity_ids - removed_entity_ids
-            ):
+        # An entity whose state equals the mode default is recorded by its absence
+        # from the filter. That works for live entities but erases configured IDs
+        # Home Assistant no longer knows, so retain those in the entity
+        # configuration until they are explicitly removed.
+        for entity_id in universe - known_entity_ids - removed_entity_ids:
+            if exposure.get(entity_id) == expose_new_entities:
                 entity_config.setdefault(entity_id, {})
 
         represented = {

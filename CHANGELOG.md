@@ -5,6 +5,28 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+### Fixed
+
+- Migration no longer discards configured entity IDs that Home Assistant no
+  longer knows. A hidden entity is recorded by its absence from the filter, so
+  missing IDs are now retained in the entity configuration until they are
+  removed explicitly. Previously every stale ID from a legacy `exclude_entities`
+  list was lost.
+- Migration no longer imports entities Alexa cannot control. Domains without a
+  Home Assistant Alexa adapter, such as `select`, `calendar`, and `notify`, are
+  counted as unsupported and skipped unless they carry Alexa metadata, which is
+  preserved as hidden. A normal save already refused to expose them.
+- Migration reads the Alexa configuration captured before activation instead of
+  the managed include files that replaced it. The capture refreshes on every
+  restart until activation, and the preview reports which source it used.
+
+### Added
+
+- Migration refuses to import when the managed files changed after the legacy
+  configuration was captured, so saved exposure choices are not overwritten.
+- The migration preview shows whether it read a captured configuration and when
+  that capture was taken.
+
 ## [0.1.1] - 2026-08-10
 
 ### Fixed

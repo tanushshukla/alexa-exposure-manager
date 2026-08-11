@@ -564,6 +564,66 @@ async def test_multi_category_managed_file_is_read_only_not_truncated(
 
 
 @pytest.mark.asyncio
+async def test_hidden_missing_entity_is_retained_without_a_mode_switch(
+    tmp_path: Path,
+) -> None:
+    """Migration flattens a legacy exclude list into include mode without switching.
+
+    A hidden missing ID cannot be represented in ``include_entities``, so its only
+    record is the entity configuration. It must survive until explicitly removed.
+    """
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    initial = await managed.async_read({"light.present"})
+
+    await managed.async_save(
+        expected_revision=initial["revision"],
+        expected_entities_revision=initial["entities_revision"],
+        expose_new_entities=False,
+        entities=[
+            {"entity_id": "light.present", "exposed": True},
+            {"entity_id": "switch.legacy_excluded", "exposed": False},
+        ],
+        known_entity_ids={"light.present"},
+    )
+
+    snapshot = await managed.async_read({"light.present"})
+    assert snapshot["missing_entity_ids"] == ["switch.legacy_excluded"]
+    assert snapshot["exposure"]["switch.legacy_excluded"] is False
+
+
+@pytest.mark.asyncio
+async def test_retained_hidden_missing_entity_returns_on_mode_switch(
+    tmp_path: Path,
+) -> None:
+    """A retained hidden missing ID must reappear in exclude_entities later."""
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    initial = await managed.async_read({"light.present"})
+    saved = await managed.async_save(
+        expected_revision=initial["revision"],
+        expected_entities_revision=initial["entities_revision"],
+        expose_new_entities=False,
+        entities=[
+            {"entity_id": "light.present", "exposed": True},
+            {"entity_id": "switch.legacy_excluded", "exposed": False},
+        ],
+        known_entity_ids={"light.present"},
+    )
+
+    await managed.async_save(
+        expected_revision=saved["revision"],
+        expected_entities_revision=saved["entities_revision"],
+        expose_new_entities=True,
+        entities=[],
+        known_entity_ids={"light.present"},
+    )
+
+    filter_text = (tmp_path / "alexa_exposure_filter.yaml").read_text()
+    assert "switch.legacy_excluded" in filter_text
+
+
+@pytest.mark.asyncio
 async def test_missing_entry_can_be_explicitly_removed(tmp_path: Path) -> None:
     (tmp_path / "alexa_exposure_filter.yaml").write_text(
         "include_entities:\n  - light.missing\n"
