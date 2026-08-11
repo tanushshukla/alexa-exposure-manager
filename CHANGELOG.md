@@ -5,6 +5,8 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-11
+
 ### Fixed
 
 - Migration no longer discards configured entity IDs that Home Assistant no
