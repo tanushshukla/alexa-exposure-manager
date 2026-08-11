@@ -512,6 +512,28 @@ describe("alexa-exposure-manager-panel", () => {
     expect(connection.sendMessagePromise.mock.calls.length).toBeGreaterThan(initialCalls);
   });
 
+  it("shows that migration reads the configuration captured before activation", async () => {
+    const panel = await createPanel({
+      "alexa_exposure_manager/status": { configured: false, revision: "setup-r2" },
+      "alexa_exposure_manager/entities": { revision: "setup-r2", entities_revision: "entities-r1", entities: [] },
+      "alexa_exposure_manager/migration/preview": {
+        token: "migration-token",
+        revision: "setup-r2",
+        entities_revision: "entities-r1",
+        counts: { exposed: 2, hidden: 1, unsupported: 0, missing: 0 },
+        legacy_source: { from_snapshot: true, captured_at: "2026-08-09T10:00:00+00:00" },
+      },
+    });
+    const root = panel.shadowRoot!;
+
+    root.querySelector<HTMLButtonElement>("[aria-label='Preview existing Alexa configuration']")!.click();
+    await settle(panel);
+
+    expect(root.textContent).toContain(
+      "Read from the Alexa configuration captured on 2026-08-09T10:00:00+00:00, before the managed include files were activated.",
+    );
+  });
+
   it("previews and confirms migration from the setup-only state", async () => {
     const panel = await createPanel({
       "alexa_exposure_manager/status": { configured: false, revision: "setup-r2" },

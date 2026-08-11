@@ -656,6 +656,8 @@ var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	migrationBody: "If Alexa is already configured in YAML, preview a safe import into the manager-owned include files.",
 	migrationUnavailable: "No existing Alexa configuration is available to import.",
 	migrationSummary: "{exposed} exposed, {hidden} hidden, {unsupported} unsupported, and {missing} missing entities will be imported.",
+	migrationSourceSnapshot: "Read from the Alexa configuration captured on {captured}, before the managed include files were activated.",
+	migrationSourceLive: "Read from your current Alexa configuration.",
 	migrationImport: "Import existing Alexa configuration",
 	migrationConfirmTitle: "Import existing Alexa configuration?",
 	migrationConfirmBody: "The manager will create its dedicated include files from the preview. Alexa credentials and unrelated YAML are not changed.",
@@ -781,6 +783,7 @@ var $ = class e extends Z {
           <button type="button" aria-label=${Q("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${Q("migrationPreview")}</button>
           ${this.migrationPreviewResponse ? B`<div class="migration-result" role="status">
                 <span>${this.migrationSummary()}</span>
+                <span class="migration-source">${this.migrationSource()}</span>
                 ${typeof this.migrationPreviewResponse.token == "string" ? B`<button class="secondary" type="button" aria-label=${Q("migrationImport")} @click=${() => {
 			this.confirmation = "migration";
 		}}>${Q("migrationImport")}</button>` : H}
@@ -1477,6 +1480,12 @@ var $ = class e extends Z {
 			unsupported: Number(t.unsupported ?? 0),
 			missing: Number(t.missing ?? 0)
 		});
+	}
+	migrationSource() {
+		let e = this.migrationPreviewResponse?.legacy_source;
+		if (!e || typeof e != "object") return H;
+		let t = e;
+		return t.from_snapshot === !0 ? Q("migrationSourceSnapshot", { captured: String(t.captured_at ?? "") }) : Q("migrationSourceLive");
 	}
 	get normalizedEntities() {
 		return (Array.isArray(this.entitiesResponse?.entities) ? this.entitiesResponse.entities : []).map((e) => this.normalizeEntity(e));

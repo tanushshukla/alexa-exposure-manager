@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 import yaml
@@ -57,10 +58,81 @@ class AlexaExposureManagerRuntime:
         stored = await self._store.async_load()
         if isinstance(stored, dict):
             self._state.update(stored)
+        await self._async_capture_legacy_snapshot()
         if self._state["restart_required"] and await self._active_matches_managed():
             self._state["restart_required"] = False
             self._state["restart_revisions"] = None
             await self._async_save_state()
+
+    async def _async_capture_legacy_snapshot(self) -> None:
+        """Retain the last Alexa configuration seen before activation.
+
+        Activation repoints alexa.smart_home.filter and entity_config at the
+        managed files, so the legacy rules stop being readable from the resolved
+        configuration. Re-capture on every startup until activation freezes the
+        last good copy, which is what migration must flatten.
+        """
+        if self._state["migration_state"] == "complete":
+            return
+        if self.startup_alexa.get("filter_active"):
+            return
+        legacy_filter = self.startup_alexa.get("filter") or {}
+        legacy_metadata = self.startup_alexa.get("entity_config") or {}
+        if not legacy_filter and not legacy_metadata:
+            return
+        managed = await self.transaction.async_read()
+        self._state["legacy_snapshot"] = {
+            "filter": legacy_filter,
+            "entity_config": legacy_metadata,
+            "captured_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "managed_revisions": {
+                "revision": managed["revision"],
+                "entities_revision": managed["entities_revision"],
+            },
+        }
+        await self._async_save_state()
+
+    @staticmethod
+    def _require_fresh_snapshot(
+        legacy_source: Mapping[str, Any], catalog_response: Mapping[str, Any]
+    ) -> None:
+        """Refuse to flatten a snapshot older than the current managed files.
+
+        Importing then would silently discard exposure choices saved through the
+        panel after the legacy configuration was captured.
+        """
+        captured = legacy_source.get("managed_revisions")
+        if not isinstance(captured, Mapping):
+            return
+        if captured.get("revision") == catalog_response["revision"] and captured.get(
+            "entities_revision"
+        ) == catalog_response["entities_revision"]:
+            return
+        raise InvalidManagedConfigurationError(
+            "The managed Alexa files changed after the existing configuration was "
+            f"captured on {legacy_source.get('captured_at')}. Re-check your Alexa "
+            "YAML and reload this page before importing, so that saved exposure "
+            "choices are not overwritten."
+        )
+
+    def _legacy_source(self) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        """Return the legacy filter, metadata, and where they came from."""
+        snapshot = self._state.get("legacy_snapshot")
+        if isinstance(snapshot, dict):
+            return (
+                snapshot.get("filter") or {},
+                snapshot.get("entity_config") or {},
+                {
+                    "from_snapshot": True,
+                    "captured_at": snapshot.get("captured_at"),
+                    "managed_revisions": snapshot.get("managed_revisions"),
+                },
+            )
+        return (
+            self.startup_alexa.get("filter", {}),
+            self.startup_alexa.get("entity_config", {}),
+            {"from_snapshot": False, "captured_at": None},
+        )
 
     async def async_status(self) -> dict[str, Any]:
         """Return setup, activation, file health, and operational state."""
@@ -224,8 +296,8 @@ class AlexaExposureManagerRuntime:
         """Flatten the active legacy filter using HA Alexa exposure semantics."""
         catalog_response = await self.async_entities()
         catalog = catalog_response["entities"]
-        legacy_filter = self.startup_alexa.get("filter", {})
-        legacy_metadata = self.startup_alexa.get("entity_config", {})
+        legacy_filter, legacy_metadata, legacy_source = self._legacy_source()
+        self._require_fresh_snapshot(legacy_source, catalog_response)
         include_keys = {
             "include_entities",
             "include_domains",
@@ -257,6 +329,12 @@ class AlexaExposureManagerRuntime:
                 counts["exposed" if exposed else "hidden"] += 1
             else:
                 counts["unsupported"] += 1
+                # Alexa has no adapter for these, and a normal save refuses to
+                # expose them. Propose only the ones carrying legacy metadata,
+                # always hidden, so that metadata survives migration.
+                if entity["entity_id"] not in legacy_metadata:
+                    continue
+                exposed = False
             proposed_entities.append(
                 self._migration_entity(
                     entity["entity_id"],
@@ -299,6 +377,7 @@ class AlexaExposureManagerRuntime:
         return {
             "token": token,
             "counts": counts,
+            "legacy_source": legacy_source,
             "expose_new_entities": expose_new_entities,
             "revision": preview["revision"],
             "entities_revision": preview["entities_revision"],

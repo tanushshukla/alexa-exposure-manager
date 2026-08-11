@@ -233,6 +233,7 @@ export class AlexaExposureManagerPanel extends LitElement {
           ${this.migrationPreviewResponse
             ? html`<div class="migration-result" role="status">
                 <span>${this.migrationSummary()}</span>
+                <span class="migration-source">${this.migrationSource()}</span>
                 ${typeof this.migrationPreviewResponse.token === "string"
                   ? html`<button class="secondary" type="button" aria-label=${t("migrationImport")} @click=${() => { this.confirmation = "migration"; }}>${t("migrationImport")}</button>`
                   : nothing}
@@ -1078,6 +1079,16 @@ export class AlexaExposureManagerPanel extends LitElement {
       hidden: Number(values.hidden ?? 0),
       unsupported: Number(values.unsupported ?? 0),
       missing: Number(values.missing ?? 0),
+    });
+  }
+
+  private migrationSource() {
+    const source = this.migrationPreviewResponse?.legacy_source;
+    if (!source || typeof source !== "object") return nothing;
+    const values = source as Record<string, unknown>;
+    if (values.from_snapshot !== true) return t("migrationSourceLive");
+    return t("migrationSourceSnapshot", {
+      captured: String(values.captured_at ?? ""),
     });
   }
 

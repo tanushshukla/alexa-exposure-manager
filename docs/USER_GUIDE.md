@@ -170,10 +170,23 @@ filter or entity configuration.
    exposure.
 7. Save, validate, restart, and run Alexa discovery.
 
-Migration evaluates the active resolved filter using Home Assistant's actual
+Migration evaluates your legacy filter using Home Assistant's actual
 `EntityFilter` precedence. It flattens entity, domain, and glob rules into a
 simple per-entity state. It does not rewrite the old user-owned Alexa file and
 does not change managed files merely because you opened the preview.
+
+Activation repoints `filter` and `entity_config` at the managed files, so your
+legacy rules stop being readable from the running configuration. The integration
+therefore captures your Alexa configuration on every restart until activation,
+and migration flattens that captured copy. The preview states which source it
+used and when it was captured. If you have already saved exposure changes
+through the panel, migration refuses rather than overwrite them; re-check your
+Alexa YAML and reload the page before importing.
+
+Entities in domains Alexa cannot control, such as `select`, `calendar`, and
+`notify`, are counted as unsupported and are not imported. Configured entity IDs
+that Home Assistant no longer knows are retained and stay visible until you
+remove them explicitly.
 
 After migration, domain and glob rule editing is not available in v1. Keep the
 old configuration backup until you have checked Alexa discovery and control.
