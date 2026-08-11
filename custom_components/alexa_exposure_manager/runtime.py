@@ -104,9 +104,11 @@ class AlexaExposureManagerRuntime:
         captured = legacy_source.get("managed_revisions")
         if not isinstance(captured, Mapping):
             return
-        if captured.get("revision") == catalog_response["revision"] and captured.get(
-            "entities_revision"
-        ) == catalog_response["entities_revision"]:
+        if (
+            captured.get("revision") == catalog_response["revision"]
+            and captured.get("entities_revision")
+            == catalog_response["entities_revision"]
+        ):
             return
         raise InvalidManagedConfigurationError(
             "The managed Alexa files changed after the existing configuration was "
