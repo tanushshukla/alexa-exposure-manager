@@ -5,6 +5,15 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-11
+
+### Fixed
+
+- The panel now shows the actual reason when Alexa exposure data cannot be
+  loaded. Home Assistant rejects WebSocket calls with a plain `{code, message}`
+  object rather than an `Error`, so every load failure rendered as
+  `[object Object]` and hid the cause.
+
 ## [0.1.2] - 2026-08-11
 
 ### Fixed
