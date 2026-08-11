@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate release artifact syntax
         run: scripts/validate-release-artifacts.sh
@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Require production integration
         run: test -f custom_components/alexa_exposure_manager/manifest.json
@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Require production integration
         run: test -f custom_components/alexa_exposure_manager/manifest.json
