@@ -9,8 +9,11 @@ canonical v1 specification.
 ## Repository Structure
 
 - [ ] `custom_components/alexa_exposure_manager` contains the complete runtime.
-- [ ] `manifest.json` declares domain, name, version `0.1.0`, documentation,
-  issue tracker, code owners, config flow, and valid integration metadata.
+- [ ] `manifest.json` declares domain, name, the version being released,
+  documentation, issue tracker, code owners, config flow, and valid integration
+  metadata.
+- [ ] `manifest.json` and `const.py` declare the same version. A backend test
+  enforces this, so a partial bump fails CI.
 - [ ] Config flow strings use Home Assistant translation resources and the
   panel ships its English strings compiled into the custom panel.
 - [ ] The production panel is Lit and bundled with the integration.
@@ -26,9 +29,9 @@ canonical v1 specification.
 - [ ] Python Ruff lint and format checks pass.
 - [ ] Python mypy check passes.
 - [ ] Backend tests pass.
-- [ ] Compatibility tests pass for HA `2026.6.4` with test package `0.13.340`.
-- [ ] Compatibility tests pass for HA `2026.7.4` with test package `0.13.348`.
-- [ ] Compatibility tests pass for HA `2026.8.1` with test package `0.13.355`.
+- [ ] Compatibility tests pass for every Home Assistant version in the matrix in
+  `.github/workflows/python.yml`, each with its paired
+  `pytest-homeassistant-custom-component` version.
 - [ ] HACS validation passes without ignored checks.
 - [ ] Hassfest passes.
 - [ ] Dependency review, npm audit, Python runtime requirement audit, and secret
@@ -80,13 +83,17 @@ canonical v1 specification.
   rollback, restart, Alexa discovery, recovery, privacy, and troubleshooting are
   complete.
 - [ ] No document describes the React prototype as production behavior.
-- [ ] `CHANGELOG.md` and `docs/releases/0.1.0.md` match the shipped runtime.
+- [ ] `CHANGELOG.md` and the release note for the version being released,
+  `docs/releases/<version>.md`, match the shipped runtime.
 
 ## Remote Publication
 
 - [ ] Merge the reviewed release commit.
-- [ ] Create signed or annotated tag `v0.1.0` from the accepted commit.
-- [ ] Publish a GitHub release using `docs/releases/0.1.0.md`.
+- [ ] Create a signed or annotated tag `v<version>` from the accepted commit.
+- [ ] Publish a GitHub release using `docs/releases/<version>.md`.
+- [ ] Confirm the released commit's workflow runs completed. Pushing the branch
+  and the tag together can cancel in-progress runs, which reports as cancelled
+  rather than failed; re-run any that were cancelled.
 - [ ] Verify HACS can install the release, not merely the default branch.
 - [ ] Monitor installation and security reports.
 

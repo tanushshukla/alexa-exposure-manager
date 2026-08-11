@@ -1,8 +1,7 @@
 # Alexa Exposure Manager User Guide
 
 This guide covers installation, activation, migration, daily entity management,
-safe saving, recovery, privacy, and troubleshooting for Alexa Exposure Manager
-`0.1.0`.
+safe saving, recovery, privacy, and troubleshooting for Alexa Exposure Manager.
 
 GitHub issue [#12](https://github.com/tanushshukla/alexa-exposure-manager/issues/12)
 is the canonical v1 specification.
