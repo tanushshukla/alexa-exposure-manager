@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from .const import ENTITY_CONFIG_FILENAME, FILTER_FILENAME
+
+_LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from homeassistant.components.alexa.config import AbstractConfig
@@ -98,6 +101,7 @@ async def async_resolved_alexa_config(hass) -> dict[str, Any]:
             "entity_config": {},
             "filter_active": False,
             "entity_config_active": False,
+            "legacy_source_available": False,
             "issues": [
                 "Home Assistant could not resolve configuration YAML; fix the YAML "
                 "error shown in Settings > System > Logs"
@@ -112,6 +116,7 @@ async def async_resolved_alexa_config(hass) -> dict[str, Any]:
             "entity_config": {},
             "filter_active": False,
             "entity_config_active": False,
+            "legacy_source_available": False,
             "issues": ["alexa.smart_home is not configured"],
         }
 
@@ -141,6 +146,7 @@ async def async_resolved_alexa_config(hass) -> dict[str, Any]:
         "entity_config": entity_config if isinstance(entity_config, dict) else {},
         "filter_active": filter_active,
         "entity_config_active": entity_active,
+        "legacy_source_available": not filter_active and not entity_active,
         "issues": issues,
     }
 
@@ -226,13 +232,16 @@ def alexa_entity_support(
     try:
         adapter = adapter_class(
             hass,
-            cast(AbstractConfig, _CatalogAlexaConfig(entity_config)),
+            cast("AbstractConfig", _CatalogAlexaConfig(entity_config)),
             state,
         )
         if not list(adapter.interfaces()):
             return False, "This entity has no Alexa-compatible capabilities", None
         categories = adapter.default_display_categories()
     except Exception:
+        _LOGGER.exception(
+            "Alexa adapter failed while checking support for %s", state.entity_id
+        )
         return (
             False,
             "This entity's current state or device class is not compatible with Alexa",

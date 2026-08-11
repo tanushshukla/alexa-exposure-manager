@@ -165,6 +165,131 @@ describe("alexa-exposure-manager-panel", () => {
     expect(panel.shadowRoot?.querySelector("[aria-label='Entity search']")).toBeNull();
   });
 
+  it("shows guided migration steps when empty managed files now exist", async () => {
+    const panel = await createPanel({
+      "alexa_exposure_manager/status": {
+        configured: false,
+        revision: "status-r1",
+        managed_files: { safe_defaults: true },
+        migration_available: true,
+      },
+      "alexa_exposure_manager/entities": {
+        revision: "entities-r1",
+        entities: [],
+      },
+    });
+
+    const text = panel.shadowRoot!.textContent!;
+    expect(text).toContain("The managed files now exist");
+    expect(text).toContain("Retry does not migrate your existing Alexa configuration");
+    expect(text).toContain("Keep your current inline filter in alexa.yaml");
+    expect(text).toContain("Preview existing Alexa configuration");
+    expect(text).toContain("Replace the inline filter with the two managed includes");
+    expect(text).toContain("Check configuration and restart Home Assistant");
+  });
+
+  it("explains missing migration sources before managed includes are active", async () => {
+    const panel = await createPanel({
+      "alexa_exposure_manager/status": {
+        configured: false,
+        migration_available: false,
+      },
+      "alexa_exposure_manager/entities": { entities: [] },
+    });
+
+    const text = panel.shadowRoot!.textContent!;
+    expect(text).toContain("No previous Alexa configuration was captured");
+    expect(text).toContain("restore the old inline filter from a backup");
+    expect(text).toContain("start fresh using the exposure controls below");
+    expect(panel.shadowRoot!.querySelector("[aria-label='Preview existing Alexa configuration']")).toBeNull();
+  });
+
+  it("keeps migration available after the managed includes are active", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/status"] = {
+      ...responses["alexa_exposure_manager/status"] as Record<string, unknown>,
+      migration_state: "not_started",
+      migration_available: true,
+    };
+    responses["alexa_exposure_manager/migration/preview"] = {
+      token: "migration-token",
+      revision: "config-r4",
+      entities_revision: "entities-r9",
+      counts: { exposed: 2, hidden: 2, unsupported: 0, missing: 0 },
+      legacy_source: { from_snapshot: true, captured_at: "2026-08-09T10:00:00+00:00" },
+    };
+    responses["alexa_exposure_manager/migration/confirm"] = { migration_state: "complete" };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+
+    expect(root.textContent).toContain("Existing Alexa configuration is ready to import");
+    root.querySelector<HTMLButtonElement>("[aria-label='Preview existing Alexa configuration']")!.click();
+    await settle(panel);
+
+    expect(root.textContent).toContain("2 exposed, 2 hidden, 0 unsupported, and 0 missing entities will be imported");
+    const statusCallsBefore = panel.hass.connection.sendMessagePromise.mock.calls.filter(
+      ([message]) => message.type === "alexa_exposure_manager/status",
+    ).length;
+    root.querySelector<HTMLButtonElement>("[aria-label='Import existing Alexa configuration']")!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>("[aria-label='Confirm migration']")!.click();
+    await settle(panel);
+    const statusCallsAfter = panel.hass.connection.sendMessagePromise.mock.calls.filter(
+      ([message]) => message.type === "alexa_exposure_manager/status",
+    ).length;
+    expect(statusCallsAfter).toBeGreaterThan(statusCallsBefore);
+  });
+
+  it("shows configured migration when Home Assistant currently has no entities", async () => {
+    const panel = await createPanel({
+      "alexa_exposure_manager/status": {
+        configured: true,
+        migration_state: "not_started",
+        migration_available: true,
+      },
+      "alexa_exposure_manager/entities": { entities: [] },
+    });
+
+    const text = panel.shadowRoot!.textContent!;
+    expect(text).toContain("Existing Alexa configuration is ready to import");
+    expect(text).toContain("No entities available");
+  });
+
+  it("explains recovery when deleted Alexa YAML was never captured", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/status"] = {
+      ...responses["alexa_exposure_manager/status"] as Record<string, unknown>,
+      migration_state: "not_started",
+      migration_available: false,
+    };
+    const panel = await createPanel(responses);
+
+    const text = panel.shadowRoot!.textContent!;
+    expect(text).toContain("No previous Alexa configuration was captured");
+    expect(text).toContain("Alexa cannot reconstruct previous YAML rules from its device list");
+    expect(text).toContain("restore the old inline filter from a backup");
+    expect(text).toContain("start fresh using the exposure controls below");
+  });
+
+  it("keeps configured migration errors visible without replacing the manager", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/status"] = {
+      ...responses["alexa_exposure_manager/status"] as Record<string, unknown>,
+      migration_state: "not_started",
+      migration_available: true,
+    };
+    responses["alexa_exposure_manager/migration/preview"] = new Error("Migration preview failed");
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+
+    root.querySelector<HTMLButtonElement>("[aria-label='Preview existing Alexa configuration']")!.click();
+    await settle(panel);
+
+    expect(root.textContent).toContain("Migration preview failed");
+    expect(root.textContent).toContain("Alexa exposure");
+    expect(root.textContent).not.toContain("Alexa exposure data could not be loaded");
+  });
+
   it("searches real entities, stages exposure, and saves with expected revisions", async () => {
     const panel = await createPanel(configuredResponses());
     const root = panel.shadowRoot!;

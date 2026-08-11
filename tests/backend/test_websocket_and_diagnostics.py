@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import Unauthorized
 
 from custom_components.alexa_exposure_manager import async_setup
+from custom_components.alexa_exposure_manager.compatibility import alexa_entity_support
 from custom_components.alexa_exposure_manager.const import DOMAIN
 from custom_components.alexa_exposure_manager.diagnostics import (
     build_redacted_diagnostics,
@@ -34,6 +35,62 @@ EXPECTED_COMMANDS = {
     "alexa_exposure_manager/diagnostics",
     "alexa_exposure_manager/support_export",
 }
+
+
+@pytest.mark.asyncio
+async def test_alexa_support_uses_home_assistant_adapter_without_false_negative(
+    tmp_path,
+) -> None:
+    from homeassistant.core import State
+
+    hass = HomeAssistant(str(tmp_path))
+
+    supported, reason, categories = alexa_entity_support(
+        hass,
+        State("light.kitchen", "on", {"supported_color_modes": ["onoff"]}),
+        {},
+    )
+    await hass.async_stop(force=True)
+
+    assert supported is True
+    assert reason is None
+    assert categories == ["LIGHT"]
+
+
+@pytest.mark.asyncio
+async def test_empty_inline_alexa_configuration_is_captured_for_migration() -> None:
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    class Transaction:
+        async def async_read(self):
+            return {"revision": "filter-r1", "entities_revision": "entities-r1"}
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = {
+        "filter": {},
+        "entity_config": {},
+        "filter_active": False,
+        "entity_config_active": False,
+        "legacy_source_available": True,
+    }
+    runtime.transaction = Transaction()
+    runtime._state = {"migration_state": "not_started"}
+
+    async def _async_save_state():
+        return None
+
+    runtime._async_save_state = _async_save_state
+
+    await runtime._async_capture_legacy_snapshot()
+
+    assert runtime._state["legacy_snapshot"]["filter"] == {}
+    assert runtime._state["legacy_snapshot"]["entity_config"] == {}
+    assert runtime._state["legacy_snapshot"]["managed_revisions"] == {
+        "revision": "filter-r1",
+        "entities_revision": "entities-r1",
+    }
 
 
 @dataclass
@@ -130,6 +187,8 @@ async def test_status_command_returns_nested_instructions_without_secrets() -> N
                 "revision": "filter-r1",
                 "entities_revision": "entities-r1",
                 "expose_new_entities": False,
+                "exposure": {},
+                "entity_config": {},
                 "read_only": False,
                 "read_only_reasons": [],
             }
@@ -142,6 +201,7 @@ async def test_status_command_returns_nested_instructions_without_secrets() -> N
     runtime.startup_alexa = {
         "filter_active": True,
         "entity_config_active": True,
+        "legacy_source_available": True,
         "filter": {"include_entities": ["light.secret_name"]},
         "entity_config": {},
         "client_secret": "must-not-leak",
@@ -169,6 +229,8 @@ async def test_status_command_returns_nested_instructions_without_secrets() -> N
             "  entity_config: !include alexa_entity_config.yaml"
         ),
     }
+    assert status["managed_files"]["safe_defaults"] is True
+    assert status["migration_available"] is True
     assert "must-not-leak" not in repr(status)
     assert "light.secret_name" not in repr(status)
 
@@ -848,6 +910,30 @@ async def test_migration_reads_the_pre_activation_snapshot_not_the_managed_file(
     assert result["legacy_source"]["captured_at"] == "2026-08-09T10:00:00+00:00"
     proposed = {e["entity_id"]: e["exposed"] for e in runtime.transaction.proposed}
     assert proposed == {"light.kept": True, "light.dropped": False}
+
+
+@pytest.mark.asyncio
+async def test_migration_refuses_managed_files_without_a_legacy_snapshot() -> None:
+    runtime = _migration_runtime(
+        {
+            "filter": {"include_entities": []},
+            "entity_config": {},
+            "filter_active": True,
+            "entity_config_active": True,
+            "legacy_source_available": False,
+        },
+        [],
+    )
+
+    connection = await call_command(
+        websocket_migration_preview,
+        runtime,
+        {"id": 23, "type": "alexa_exposure_manager/migration/preview"},
+    )
+
+    assert connection.results == []
+    assert connection.errors[0][1] == "invalid_configuration"
+    assert "No previous Alexa configuration was captured" in connection.errors[0][2]
 
 
 @pytest.mark.asyncio

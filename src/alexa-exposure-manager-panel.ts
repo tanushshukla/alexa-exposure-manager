@@ -46,6 +46,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     operationMessage: { state: true },
     migrationPreviewResponse: { state: true },
     migrationLoading: { state: true },
+    migrationError: { state: true },
     validationIssues: { state: true },
     restartBannerDismissed: { state: true },
     candidateWindowStart: { state: true },
@@ -85,6 +86,7 @@ export class AlexaExposureManagerPanel extends LitElement {
   declare private operationMessage: string;
   declare private migrationPreviewResponse?: Record<string, unknown>;
   declare private migrationLoading: boolean;
+  declare private migrationError: string;
   declare private validationIssues: ValidationIssue[];
   declare private restartBannerDismissed: boolean;
   declare private candidateWindowStart: number;
@@ -115,6 +117,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.advancedError = "";
     this.operationMessage = "";
     this.migrationLoading = false;
+    this.migrationError = "";
     this.validationIssues = [];
     this.restartBannerDismissed = false;
     this.candidateWindowStart = 0;
@@ -189,13 +192,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         ${!this.loading && !this.error && !this.isConfigured()
           ? this.renderSetup()
           : nothing}
-        ${!this.loading && !this.error && this.isConfigured() && this.entityCount === 0
-          ? html`<section class="state">
-              <h1>${t("emptyTitle")}</h1>
-              <p>${t("emptyBody")}</p>
-            </section>`
-          : nothing}
-        ${!this.loading && !this.error && this.isConfigured() && this.entityCount > 0
+        ${!this.loading && !this.error && this.isConfigured()
           ? this.renderManager()
           : nothing}
         ${this.addDialogOpen ? this.renderAddDialog() : nothing}
@@ -217,31 +214,79 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private renderSetup() {
+    const migrationReady = this.status?.managed_files?.safe_defaults === true &&
+      this.status?.migration_available === true;
     return html`
       <section class="setup">
-        <span class="eyebrow">${t("setupEyebrow")}</span>
-        <h1>${t("setupTitle")}</h1>
-        <p>${t("setupBody")}</p>
+        <span class="eyebrow">${t(migrationReady ? "recoveryEyebrow" : "setupEyebrow")}</span>
+        <h1>${t(migrationReady ? "recoveryTitle" : "setupTitle")}</h1>
+        <p>${t(migrationReady ? "recoveryBody" : "setupBody")}</p>
+        ${migrationReady
+          ? html`<ol class="recovery-steps">
+              <li>${t("recoveryKeepInline")}</li>
+              <li>${t("recoveryPreview")}</li>
+              <li>${t("recoveryImport")}</li>
+              <li>${t("recoveryReplace")}</li>
+              <li>${t("recoveryRestart")}</li>
+              <li>${t("recoveryDiscover")}</li>
+            </ol>`
+          : nothing}
         <strong class="setup-label">${t("setupConfigurationLabel")}</strong>
         <pre><code>${t("setupConfigurationInclude")}</code></pre>
         <strong class="setup-label">${t("setupAlexaLabel")}</strong>
         <pre><code>${t("setupSmartHome")}\n  ${t("setupFilter")}\n  ${t("setupEntityConfig")}</code></pre>
         <p class="safety">${t("setupSafety")}</p>
-        <div class="migration">
-          <p>${t("migrationBody")}</p>
-          <button type="button" aria-label=${t("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${t("migrationPreview")}</button>
-          ${this.migrationPreviewResponse
-            ? html`<div class="migration-result" role="status">
-                <span>${this.migrationSummary()}</span>
-                <span class="migration-source">${this.migrationSource()}</span>
-                ${typeof this.migrationPreviewResponse.token === "string"
-                  ? html`<button class="secondary" type="button" aria-label=${t("migrationImport")} @click=${() => { this.confirmation = "migration"; }}>${t("migrationImport")}</button>`
-                  : nothing}
-              </div>`
-            : nothing}
-        </div>
+        ${this.status?.migration_available === false
+          ? html`<div class="setup-source-note">
+              <strong>${t("migrationMissingTitle")}</strong>
+              <span>${t("migrationMissingBody")}</span>
+            </div>`
+          : nothing}
+        ${this.status?.migration_available !== false
+          ? html`<div class="migration">
+              <p>${t("migrationBody")}</p>
+              ${this.renderMigrationActions()}
+            </div>`
+          : nothing}
       </section>
     `;
+  }
+
+  private renderMigrationActions() {
+    return html`
+      <button type="button" aria-label=${t("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${t("migrationPreview")}</button>
+      ${this.migrationPreviewResponse
+        ? html`<div class="migration-result" role="status">
+            <span>${this.migrationSummary()}</span>
+            <span class="migration-source">${this.migrationSource()}</span>
+            ${typeof this.migrationPreviewResponse.token === "string"
+              ? html`<button class="secondary" type="button" aria-label=${t("migrationImport")} @click=${() => { this.confirmation = "migration"; }}>${t("migrationImport")}</button>`
+              : nothing}
+          </div>`
+        : nothing}
+      ${this.migrationError
+        ? html`<p class="migration-error" role="alert">${this.migrationError}</p>`
+        : nothing}
+    `;
+  }
+
+  private renderConfiguredMigration() {
+    if (this.status?.migration_state === "complete") return nothing;
+    if (this.status?.migration_available) {
+      return html`<section class="migration-notice">
+        <div>
+          <strong>${t("migrationReadyTitle")}</strong>
+          <span>${t("migrationReadyBody")}</span>
+        </div>
+        ${this.renderMigrationActions()}
+      </section>`;
+    }
+    return html`<section class="migration-notice missing-source">
+      <div>
+        <strong>${t("migrationMissingTitle")}</strong>
+        <span>${t("migrationMissingBody")}</span>
+      </div>
+    </section>`;
   }
 
   private renderManager() {
@@ -284,6 +329,7 @@ export class AlexaExposureManagerPanel extends LitElement {
           </div>
         </header>
 
+        ${this.renderConfiguredMigration()}
         ${this.status?.restart_required ? this.renderRestartBanner() : nothing}
         ${!this.editingEnabled
           ? html`<section class="message error" role="alert"><strong>${t("readOnlyTitle")}</strong><span>${t("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}</span></section>`
@@ -364,7 +410,7 @@ export class AlexaExposureManagerPanel extends LitElement {
                   ${filtered.map((entity) => this.renderEntity(entity))}
                 </div>
               `
-            : html`<div class="empty"><strong>${t("filteredEmptyTitle")}</strong><span>${t("filteredEmptyBody")}</span></div>`}
+            : html`<div class="empty"><strong>${t(this.entityCount === 0 ? "emptyTitle" : "filteredEmptyTitle")}</strong><span>${t(this.entityCount === 0 ? "emptyBody" : "filteredEmptyBody")}</span></div>`}
         </section>
         ${this.renderAdvanced()}
       </div>
@@ -1030,17 +1076,21 @@ export class AlexaExposureManagerPanel extends LitElement {
         this.operationMessage = t("supportReady");
         this.downloadSupportExport(response);
       } else {
-        const response = await this.hass.connection.sendMessagePromise<StatusResponse>({
+        await this.hass.connection.sendMessagePromise<StatusResponse>({
           type: "alexa_exposure_manager/migration/confirm",
           token: String(this.migrationPreviewResponse?.token ?? ""),
           expected_revision: String(this.migrationPreviewResponse?.revision ?? this.status?.revision ?? ""),
           expected_entities_revision: String(this.migrationPreviewResponse?.entities_revision ?? this.status?.entities_revision ?? ""),
         });
-        this.status = { ...this.status, ...response };
+        this.migrationError = "";
+        this.migrationPreviewResponse = undefined;
+        this.staged = {};
+        await this.load();
       }
     } catch (error) {
       const message = this.errorMessage(error);
-      if (this.isConfigured()) this.advancedError = message;
+      if (action === "migration" && this.isConfigured()) this.migrationError = message;
+      else if (this.isConfigured()) this.advancedError = message;
       else this.error = message;
     }
   }
@@ -1061,10 +1111,12 @@ export class AlexaExposureManagerPanel extends LitElement {
   private async previewMigration() {
     if (!this.hass) return;
     this.migrationLoading = true;
+    this.migrationError = "";
     try {
       this.migrationPreviewResponse = await this.hass.connection.sendMessagePromise<Record<string, unknown>>({ type: "alexa_exposure_manager/migration/preview" });
     } catch (error) {
-      this.error = this.errorMessage(error);
+      if (this.isConfigured()) this.migrationError = this.errorMessage(error);
+      else this.error = this.errorMessage(error);
     } finally {
       this.migrationLoading = false;
     }
@@ -1273,6 +1325,13 @@ export class AlexaExposureManagerPanel extends LitElement {
     .validation { align-items: flex-start; }
     .validation ul { flex: 1; margin: 0; padding-left: 20px; line-height: 1.6; }
     .migration { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--divider-color, #e0e0e0); }
+    .migration-notice { margin-bottom: 18px; padding: 16px; border: 1px solid var(--primary-color, #03a9f4); border-radius: var(--ha-card-border-radius, 12px); background: color-mix(in srgb, var(--primary-color, #03a9f4) 7%, var(--card-background-color, #fff)); }
+    .migration-notice > div { margin-bottom: 12px; }
+    .migration-notice strong, .migration-notice span { display: block; }
+    .migration-notice span { margin-top: 5px; color: var(--secondary-text-color, #616161); line-height: 1.5; }
+    .migration-notice.missing-source { border-color: var(--warning-color, #f57c00); background: color-mix(in srgb, var(--warning-color, #f57c00) 7%, var(--card-background-color, #fff)); }
+    .migration-notice.missing-source > div { margin-bottom: 0; }
+    .migration-error { margin: 12px 0 0; color: var(--error-color, #db4437); font-weight: 600; }
     .migration-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px; border-radius: 8px; background: var(--secondary-background-color, #f5f5f5); }
     .advanced { margin-top: 20px; overflow: hidden; border: 1px solid var(--divider-color, #e0e0e0); border-radius: var(--ha-card-border-radius, 12px); background: var(--card-background-color, #fff); }
     .advanced-toggle { width: 100%; min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 20px; color: var(--primary-text-color, #212121); background: transparent; text-align: left; }
@@ -1315,6 +1374,11 @@ export class AlexaExposureManagerPanel extends LitElement {
     pre { overflow: auto; padding: 18px; border-radius: 8px; background: var(--code-editor-background-color, #1f2933); color: var(--text-primary-color, #fff); line-height: 1.7; }
     code { font-family: var(--ha-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
     .safety { border-left: 3px solid var(--primary-color, #03a9f4); padding-left: 14px; }
+    .recovery-steps { margin: 20px 0; padding-left: 24px; line-height: 1.7; }
+    .recovery-steps li { margin-top: 8px; padding-left: 5px; }
+    .setup-source-note { margin-top: 18px; padding: 14px; border-left: 3px solid var(--warning-color, #f57c00); background: color-mix(in srgb, var(--warning-color, #f57c00) 7%, transparent); }
+    .setup-source-note strong, .setup-source-note span { display: block; }
+    .setup-source-note span { margin-top: 5px; color: var(--secondary-text-color, #616161); line-height: 1.5; }
     .setup-label { display: block; margin-top: 18px; font-size: 13px; }
     button { min-height: 40px; border: 0; border-radius: 8px; padding: 0 18px; color: var(--text-primary-color, #fff); background: var(--primary-color, #03a9f4); font: inherit; font-weight: 600; cursor: pointer; }
     button:focus-visible { outline: 3px solid var(--primary-color, #03a9f4); outline-offset: 3px; }

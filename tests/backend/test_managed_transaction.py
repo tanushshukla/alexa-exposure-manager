@@ -41,6 +41,23 @@ async def test_setup_creates_only_missing_managed_files(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_read_recreates_managed_files_deleted_after_setup(tmp_path: Path) -> None:
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    (tmp_path / "alexa_exposure_filter.yaml").unlink()
+    (tmp_path / "alexa_entity_config.yaml").unlink()
+
+    snapshot = await managed.async_read({"light.kitchen"})
+
+    assert snapshot["expose_new_entities"] is False
+    assert snapshot["exposure"] == {"light.kitchen": False}
+    assert (tmp_path / "alexa_exposure_filter.yaml").read_text() == (
+        "# Managed by Alexa Exposure Manager.\ninclude_entities: []\n"
+    )
+    assert (tmp_path / "alexa_entity_config.yaml").read_text() == "{}\n"
+
+
+@pytest.mark.asyncio
 async def test_filter_key_alone_determines_exposure_mode(tmp_path: Path) -> None:
     """A hand-edited mode switch must be honoured, not locked out."""
     filter_path = tmp_path / "alexa_exposure_filter.yaml"

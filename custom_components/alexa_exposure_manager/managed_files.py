@@ -293,6 +293,9 @@ class ManagedFileTransaction:
         return self._parse_pair(filter_bytes, entity_bytes)
 
     def _read_bytes_pair(self) -> tuple[bytes, bytes]:
+        # Files can be removed while the config entry remains loaded. Restore only
+        # the missing defaults so status and recovery remain available.
+        self._initialize_files()
         return self.filter_path.read_bytes(), self.entity_config_path.read_bytes()
 
     def _parse_pair(self, filter_bytes: bytes, entity_bytes: bytes) -> _ParsedPair:

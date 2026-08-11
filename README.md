@@ -81,6 +81,11 @@ config entry and creates the two managed files only when they are absent.
 Alexa Exposure Manager never edits these user-owned files. Add the following
 structure yourself after the config flow has created the managed files.
 
+If you already have inline `filter` or `entity_config` rules, do not replace
+them with these includes yet. Restart once with the old rules still inline,
+open the panel, preview and confirm the migration, and only then activate the
+includes below.
+
 `/config/configuration.yaml`:
 
 ```yaml
@@ -131,6 +136,7 @@ existing and explicitly missing entities.
 | --- | --- |
 | Integration missing after HACS download | Confirm `custom_components/alexa_exposure_manager/manifest.json` exists and restart Home Assistant. |
 | Panel stays in setup-only mode | Add the exact nested includes, run the configuration check, then restart. Editing stays disabled until both managed files are active. |
+| Migration is unavailable after old YAML was deleted | Restore the old inline `filter` and `entity_config` from a backup, restart once so the manager can capture them, then preview migration. Deleted Alexa YAML cannot be reconstructed from the Alexa device list. |
 | Save reports a revision conflict | Reload the panel. A managed file changed after the page loaded; restage and save again. |
 | Save validation fails | The previous managed pair is restored automatically. Fix the reported Alexa/include problem before restarting. |
 | Entity is unsupported | Support comes from Home Assistant's Alexa adapters. The panel keeps the entity searchable and shows the reason. |

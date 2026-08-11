@@ -19,6 +19,7 @@ from .const import (
     PANEL_COMPONENT,
     PANEL_URL,
     STATIC_URL,
+    VERSION,
 )
 
 if TYPE_CHECKING:
@@ -53,6 +54,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             "entity_config": {},
             "filter_active": False,
             "entity_config_active": False,
+            "legacy_source_available": False,
             "issues": ["Alexa configuration was not available during startup"],
         },
     )
@@ -73,7 +75,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             webcomponent_name=PANEL_COMPONENT,
             sidebar_title="Alexa Exposure Manager",
             sidebar_icon="mdi:amazon-alexa",
-            module_url=STATIC_URL,
+            module_url=f"{STATIC_URL}?v={VERSION}",
             require_admin=True,
             config_panel_domain=DOMAIN,
         )

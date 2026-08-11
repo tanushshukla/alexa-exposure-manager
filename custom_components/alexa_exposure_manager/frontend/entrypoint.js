@@ -525,6 +525,15 @@ var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	setupFilter: "filter: !include alexa_exposure_filter.yaml",
 	setupEntityConfig: "entity_config: !include alexa_entity_config.yaml",
 	setupSafety: "The manager owns only these two include files. It never writes Alexa credentials or the rest of configuration.yaml.",
+	recoveryEyebrow: "Migration ready",
+	recoveryTitle: "The managed files now exist",
+	recoveryBody: "Retry does not migrate your existing Alexa configuration. Complete these steps once, in order.",
+	recoveryKeepInline: "Keep your current inline filter in alexa.yaml.",
+	recoveryPreview: "Select Preview existing Alexa configuration and review the counts.",
+	recoveryImport: "Select Import existing Alexa configuration and confirm the migration.",
+	recoveryReplace: "Replace the inline filter with the two managed includes shown below.",
+	recoveryRestart: "Check configuration and restart Home Assistant.",
+	recoveryDiscover: "Ask Alexa to discover devices after Home Assistant returns.",
 	emptyTitle: "No entities available",
 	emptyBody: "Home Assistant did not return any entities to manage.",
 	entitySearchLabel: "Entity search",
@@ -654,13 +663,17 @@ var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	restartRequested: "Restart requested. Keep this page open and wait for Home Assistant to return.",
 	migrationPreview: "Preview existing Alexa configuration",
 	migrationBody: "If Alexa is already configured in YAML, preview a safe import into the manager-owned include files.",
+	migrationReadyTitle: "Existing Alexa configuration is ready to import",
+	migrationReadyBody: "A copy captured before the managed includes became active is still available.",
+	migrationMissingTitle: "No previous Alexa configuration was captured",
+	migrationMissingBody: "Alexa cannot reconstruct previous YAML rules from its device list. If you had old domain, glob, entity, or metadata rules, restore the old inline filter from a backup and restart Home Assistant. Otherwise, start fresh using the exposure controls below.",
 	migrationUnavailable: "No existing Alexa configuration is available to import.",
 	migrationSummary: "{exposed} exposed, {hidden} hidden, {unsupported} unsupported, and {missing} missing entities will be imported.",
 	migrationSourceSnapshot: "Read from the Alexa configuration captured on {captured}, before the managed include files were activated.",
 	migrationSourceLive: "Read from your current Alexa configuration.",
 	migrationImport: "Import existing Alexa configuration",
 	migrationConfirmTitle: "Import existing Alexa configuration?",
-	migrationConfirmBody: "The manager will create its dedicated include files from the preview. Alexa credentials and unrelated YAML are not changed.",
+	migrationConfirmBody: "The manager will populate its dedicated include files from the preview. Alexa credentials and unrelated YAML are not changed.",
 	confirmMigration: "Confirm migration",
 	validationIssue: "{entity}: {message}",
 	readOnlyTitle: "Editing is disabled",
@@ -706,6 +719,7 @@ var $ = class e extends Z {
 		operationMessage: { state: !0 },
 		migrationPreviewResponse: { state: !0 },
 		migrationLoading: { state: !0 },
+		migrationError: { state: !0 },
 		validationIssues: { state: !0 },
 		restartBannerDismissed: { state: !0 },
 		candidateWindowStart: { state: !0 }
@@ -715,7 +729,7 @@ var $ = class e extends Z {
 	loadedConnection;
 	static CANDIDATE_WINDOW = 40;
 	constructor() {
-		super(), this.narrow = !1, this.loading = !0, this.error = "", this.query = "", this.staged = {}, this.saving = !1, this.saveError = "", this.exposeNewEntities = !1, this.addDialogOpen = !1, this.addQuery = "", this.addSelection = [], this.selectedEntities = [], this.bulkConfirmOpen = !1, this.bulkAction = "unexpose", this.visibility = "all", this.advancedOpen = !1, this.advancedLoading = !1, this.advancedError = "", this.operationMessage = "", this.migrationLoading = !1, this.validationIssues = [], this.restartBannerDismissed = !1, this.candidateWindowStart = 0;
+		super(), this.narrow = !1, this.loading = !0, this.error = "", this.query = "", this.staged = {}, this.saving = !1, this.saveError = "", this.exposeNewEntities = !1, this.addDialogOpen = !1, this.addQuery = "", this.addSelection = [], this.selectedEntities = [], this.bulkConfirmOpen = !1, this.bulkAction = "unexpose", this.visibility = "all", this.advancedOpen = !1, this.advancedLoading = !1, this.advancedError = "", this.operationMessage = "", this.migrationLoading = !1, this.migrationError = "", this.validationIssues = [], this.restartBannerDismissed = !1, this.candidateWindowStart = 0;
 	}
 	updated(e) {
 		if (e.has("hass") && this.hass && this.hass.connection !== this.loadedConnection && (this.loadedConnection = this.hass.connection, this.load()), e.has("confirmation") && this.confirmation || e.has("bulkConfirmOpen") && this.bulkConfirmOpen) {
@@ -749,11 +763,7 @@ var $ = class e extends Z {
               <button type="button" @click=${this.load}>${Q("retry")}</button>
             </section>` : H}
         ${!this.loading && !this.error && !this.isConfigured() ? this.renderSetup() : H}
-        ${!this.loading && !this.error && this.isConfigured() && this.entityCount === 0 ? B`<section class="state">
-              <h1>${Q("emptyTitle")}</h1>
-              <p>${Q("emptyBody")}</p>
-            </section>` : H}
-        ${!this.loading && !this.error && this.isConfigured() && this.entityCount > 0 ? this.renderManager() : H}
+        ${!this.loading && !this.error && this.isConfigured() ? this.renderManager() : H}
         ${this.addDialogOpen ? this.renderAddDialog() : H}
         ${this.bulkConfirmOpen ? this.renderBulkConfirmation() : H}
         ${this.metadataEntityId && this.metadataDraft ? this.renderMetadataDialog() : H}
@@ -768,29 +778,62 @@ var $ = class e extends Z {
 		return Array.isArray(this.entitiesResponse?.entities) ? this.entitiesResponse.entities.length : 0;
 	}
 	renderSetup() {
+		let e = this.status?.managed_files?.safe_defaults === !0 && this.status?.migration_available === !0;
 		return B`
       <section class="setup">
-        <span class="eyebrow">${Q("setupEyebrow")}</span>
-        <h1>${Q("setupTitle")}</h1>
-        <p>${Q("setupBody")}</p>
+        <span class="eyebrow">${Q(e ? "recoveryEyebrow" : "setupEyebrow")}</span>
+        <h1>${Q(e ? "recoveryTitle" : "setupTitle")}</h1>
+        <p>${Q(e ? "recoveryBody" : "setupBody")}</p>
+        ${e ? B`<ol class="recovery-steps">
+              <li>${Q("recoveryKeepInline")}</li>
+              <li>${Q("recoveryPreview")}</li>
+              <li>${Q("recoveryImport")}</li>
+              <li>${Q("recoveryReplace")}</li>
+              <li>${Q("recoveryRestart")}</li>
+              <li>${Q("recoveryDiscover")}</li>
+            </ol>` : H}
         <strong class="setup-label">${Q("setupConfigurationLabel")}</strong>
         <pre><code>${Q("setupConfigurationInclude")}</code></pre>
         <strong class="setup-label">${Q("setupAlexaLabel")}</strong>
         <pre><code>${Q("setupSmartHome")}\n  ${Q("setupFilter")}\n  ${Q("setupEntityConfig")}</code></pre>
         <p class="safety">${Q("setupSafety")}</p>
-        <div class="migration">
-          <p>${Q("migrationBody")}</p>
-          <button type="button" aria-label=${Q("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${Q("migrationPreview")}</button>
-          ${this.migrationPreviewResponse ? B`<div class="migration-result" role="status">
-                <span>${this.migrationSummary()}</span>
-                <span class="migration-source">${this.migrationSource()}</span>
-                ${typeof this.migrationPreviewResponse.token == "string" ? B`<button class="secondary" type="button" aria-label=${Q("migrationImport")} @click=${() => {
-			this.confirmation = "migration";
-		}}>${Q("migrationImport")}</button>` : H}
-              </div>` : H}
-        </div>
+        ${this.status?.migration_available === !1 ? B`<div class="setup-source-note">
+              <strong>${Q("migrationMissingTitle")}</strong>
+              <span>${Q("migrationMissingBody")}</span>
+            </div>` : H}
+        ${this.status?.migration_available === !1 ? H : B`<div class="migration">
+              <p>${Q("migrationBody")}</p>
+              ${this.renderMigrationActions()}
+            </div>`}
       </section>
     `;
+	}
+	renderMigrationActions() {
+		return B`
+      <button type="button" aria-label=${Q("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${Q("migrationPreview")}</button>
+      ${this.migrationPreviewResponse ? B`<div class="migration-result" role="status">
+            <span>${this.migrationSummary()}</span>
+            <span class="migration-source">${this.migrationSource()}</span>
+            ${typeof this.migrationPreviewResponse.token == "string" ? B`<button class="secondary" type="button" aria-label=${Q("migrationImport")} @click=${() => {
+			this.confirmation = "migration";
+		}}>${Q("migrationImport")}</button>` : H}
+          </div>` : H}
+      ${this.migrationError ? B`<p class="migration-error" role="alert">${this.migrationError}</p>` : H}
+    `;
+	}
+	renderConfiguredMigration() {
+		return this.status?.migration_state === "complete" ? H : this.status?.migration_available ? B`<section class="migration-notice">
+        <div>
+          <strong>${Q("migrationReadyTitle")}</strong>
+          <span>${Q("migrationReadyBody")}</span>
+        </div>
+        ${this.renderMigrationActions()}
+      </section>` : B`<section class="migration-notice missing-source">
+      <div>
+        <strong>${Q("migrationMissingTitle")}</strong>
+        <span>${Q("migrationMissingBody")}</span>
+      </div>
+    </section>`;
 	}
 	renderManager() {
 		let e = this.normalizedEntities, t = this.query.trim().toLocaleLowerCase(), n = e.filter((e) => {
@@ -821,6 +864,7 @@ var $ = class e extends Z {
           </div>
         </header>
 
+        ${this.renderConfiguredMigration()}
         ${this.status?.restart_required ? this.renderRestartBanner() : H}
         ${this.editingEnabled ? H : B`<section class="message error" role="alert"><strong>${Q("readOnlyTitle")}</strong><span>${Q("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}</span></section>`}
         ${this.saveError ? B`<section class="message error" role="alert"><strong>${Q("saveErrorTitle")}</strong><span>${this.saveError}</span></section>` : H}
@@ -895,7 +939,7 @@ var $ = class e extends Z {
                   </div>
                   ${n.map((e) => this.renderEntity(e))}
                 </div>
-              ` : B`<div class="empty"><strong>${Q("filteredEmptyTitle")}</strong><span>${Q("filteredEmptyBody")}</span></div>`}
+              ` : B`<div class="empty"><strong>${Q(this.entityCount === 0 ? "emptyTitle" : "filteredEmptyTitle")}</strong><span>${Q(this.entityCount === 0 ? "emptyBody" : "filteredEmptyBody")}</span></div>`}
         </section>
         ${this.renderAdvanced()}
       </div>
@@ -1435,21 +1479,15 @@ var $ = class e extends Z {
 					confirmed: !0
 				});
 				this.operationMessage = Q("supportReady"), this.downloadSupportExport(e);
-			} else {
-				let e = await this.hass.connection.sendMessagePromise({
-					type: "alexa_exposure_manager/migration/confirm",
-					token: String(this.migrationPreviewResponse?.token ?? ""),
-					expected_revision: String(this.migrationPreviewResponse?.revision ?? this.status?.revision ?? ""),
-					expected_entities_revision: String(this.migrationPreviewResponse?.entities_revision ?? this.status?.entities_revision ?? "")
-				});
-				this.status = {
-					...this.status,
-					...e
-				};
-			}
-		} catch (e) {
-			let t = this.errorMessage(e);
-			this.isConfigured() ? this.advancedError = t : this.error = t;
+			} else await this.hass.connection.sendMessagePromise({
+				type: "alexa_exposure_manager/migration/confirm",
+				token: String(this.migrationPreviewResponse?.token ?? ""),
+				expected_revision: String(this.migrationPreviewResponse?.revision ?? this.status?.revision ?? ""),
+				expected_entities_revision: String(this.migrationPreviewResponse?.entities_revision ?? this.status?.entities_revision ?? "")
+			}), this.migrationError = "", this.migrationPreviewResponse = void 0, this.staged = {}, await this.load();
+		} catch (t) {
+			let n = this.errorMessage(t);
+			e === "migration" && this.isConfigured() ? this.migrationError = n : this.isConfigured() ? this.advancedError = n : this.error = n;
 		}
 	}
 	downloadSupportExport(e) {
@@ -1460,11 +1498,11 @@ var $ = class e extends Z {
 	}
 	async previewMigration() {
 		if (this.hass) {
-			this.migrationLoading = !0;
+			this.migrationLoading = !0, this.migrationError = "";
 			try {
 				this.migrationPreviewResponse = await this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/migration/preview" });
 			} catch (e) {
-				this.error = this.errorMessage(e);
+				this.isConfigured() ? this.migrationError = this.errorMessage(e) : this.error = this.errorMessage(e);
 			} finally {
 				this.migrationLoading = !1;
 			}
@@ -1645,6 +1683,13 @@ var $ = class e extends Z {
     .validation { align-items: flex-start; }
     .validation ul { flex: 1; margin: 0; padding-left: 20px; line-height: 1.6; }
     .migration { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--divider-color, #e0e0e0); }
+    .migration-notice { margin-bottom: 18px; padding: 16px; border: 1px solid var(--primary-color, #03a9f4); border-radius: var(--ha-card-border-radius, 12px); background: color-mix(in srgb, var(--primary-color, #03a9f4) 7%, var(--card-background-color, #fff)); }
+    .migration-notice > div { margin-bottom: 12px; }
+    .migration-notice strong, .migration-notice span { display: block; }
+    .migration-notice span { margin-top: 5px; color: var(--secondary-text-color, #616161); line-height: 1.5; }
+    .migration-notice.missing-source { border-color: var(--warning-color, #f57c00); background: color-mix(in srgb, var(--warning-color, #f57c00) 7%, var(--card-background-color, #fff)); }
+    .migration-notice.missing-source > div { margin-bottom: 0; }
+    .migration-error { margin: 12px 0 0; color: var(--error-color, #db4437); font-weight: 600; }
     .migration-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px; border-radius: 8px; background: var(--secondary-background-color, #f5f5f5); }
     .advanced { margin-top: 20px; overflow: hidden; border: 1px solid var(--divider-color, #e0e0e0); border-radius: var(--ha-card-border-radius, 12px); background: var(--card-background-color, #fff); }
     .advanced-toggle { width: 100%; min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 20px; color: var(--primary-text-color, #212121); background: transparent; text-align: left; }
@@ -1687,6 +1732,11 @@ var $ = class e extends Z {
     pre { overflow: auto; padding: 18px; border-radius: 8px; background: var(--code-editor-background-color, #1f2933); color: var(--text-primary-color, #fff); line-height: 1.7; }
     code { font-family: var(--ha-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); }
     .safety { border-left: 3px solid var(--primary-color, #03a9f4); padding-left: 14px; }
+    .recovery-steps { margin: 20px 0; padding-left: 24px; line-height: 1.7; }
+    .recovery-steps li { margin-top: 8px; padding-left: 5px; }
+    .setup-source-note { margin-top: 18px; padding: 14px; border-left: 3px solid var(--warning-color, #f57c00); background: color-mix(in srgb, var(--warning-color, #f57c00) 7%, transparent); }
+    .setup-source-note strong, .setup-source-note span { display: block; }
+    .setup-source-note span { margin-top: 5px; color: var(--secondary-text-color, #616161); line-height: 1.5; }
     .setup-label { display: block; margin-top: 18px; font-size: 13px; }
     button { min-height: 40px; border: 0; border-radius: 8px; padding: 0 18px; color: var(--text-primary-color, #fff); background: var(--primary-color, #03a9f4); font: inherit; font-weight: 600; cursor: pointer; }
     button:focus-visible { outline: 3px solid var(--primary-color, #03a9f4); outline-offset: 3px; }

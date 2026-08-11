@@ -76,10 +76,10 @@ class AlexaExposureManagerRuntime:
             return
         if self.startup_alexa.get("filter_active"):
             return
+        if not self.startup_alexa.get("legacy_source_available", True):
+            return
         legacy_filter = self.startup_alexa.get("filter") or {}
         legacy_metadata = self.startup_alexa.get("entity_config") or {}
-        if not legacy_filter and not legacy_metadata:
-            return
         managed = await self.transaction.async_read()
         self._state["legacy_snapshot"] = {
             "filter": legacy_filter,
@@ -126,22 +126,38 @@ class AlexaExposureManagerRuntime:
                 snapshot.get("entity_config") or {},
                 {
                     "from_snapshot": True,
+                    "available": True,
                     "captured_at": snapshot.get("captured_at"),
                     "managed_revisions": snapshot.get("managed_revisions"),
                 },
             )
+        available = self.startup_alexa.get("legacy_source_available")
+        if not isinstance(available, bool):
+            available = not self.startup_alexa.get(
+                "filter_active", False
+            ) and not self.startup_alexa.get("entity_config_active", False)
         return (
             self.startup_alexa.get("filter", {}),
             self.startup_alexa.get("entity_config", {}),
-            {"from_snapshot": False, "captured_at": None},
+            {
+                "from_snapshot": False,
+                "available": available,
+                "captured_at": None,
+            },
         )
 
     async def async_status(self) -> dict[str, Any]:
         """Return setup, activation, file health, and operational state."""
         snapshot = await self.transaction.async_read()
+        _legacy_filter, _legacy_metadata, legacy_source = self._legacy_source()
         configured = bool(
             self.startup_alexa.get("filter_active")
             and self.startup_alexa.get("entity_config_active")
+        )
+        safe_defaults = bool(
+            not snapshot["expose_new_entities"]
+            and not snapshot.get("exposure")
+            and not snapshot.get("entity_config")
         )
         return {
             "configured": configured,
@@ -154,7 +170,12 @@ class AlexaExposureManagerRuntime:
             "managed_files": {
                 "filter_created": self.created_files.get("filter", False),
                 "entity_config_created": self.created_files.get("entity_config", False),
+                "safe_defaults": safe_defaults,
             },
+            "migration_available": bool(
+                self._state["migration_state"] != "complete"
+                and legacy_source["available"]
+            ),
             "include_instructions": {
                 "configuration_yaml": CONFIGURATION_INCLUDE,
                 "alexa_yaml": ALEXA_INCLUDE,
@@ -299,6 +320,14 @@ class AlexaExposureManagerRuntime:
         catalog_response = await self.async_entities()
         catalog = catalog_response["entities"]
         legacy_filter, legacy_metadata, legacy_source = self._legacy_source()
+        if self._state["migration_state"] == "complete":
+            raise InvalidManagedConfigurationError("Migration is already complete")
+        if not legacy_source["available"]:
+            raise InvalidManagedConfigurationError(
+                "No previous Alexa configuration was captured. Restore the old "
+                "inline Alexa filter from a backup and restart Home Assistant, or "
+                "start fresh with the manager."
+            )
         self._require_fresh_snapshot(legacy_source, catalog_response)
         include_keys = {
             "include_entities",
@@ -415,6 +444,8 @@ class AlexaExposureManagerRuntime:
             raise
         self._state["migration_state"] = "complete"
         await self._record_restart_required(result)
+        result["migration_state"] = "complete"
+        result["migration_available"] = False
         return result
 
     async def async_backups(self) -> dict[str, Any]:

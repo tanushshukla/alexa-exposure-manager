@@ -126,7 +126,7 @@ async def test_setup_entry_registers_admin_panel_and_expected_static_entrypoint(
             "webcomponent_name": "alexa-exposure-manager-panel",
             "sidebar_title": "Alexa Exposure Manager",
             "sidebar_icon": "mdi:amazon-alexa",
-            "module_url": "/alexa_exposure_manager/entrypoint.js",
+            "module_url": ("/alexa_exposure_manager/entrypoint.js?v=" + VERSION),
             "require_admin": True,
             "config_panel_domain": DOMAIN,
         }

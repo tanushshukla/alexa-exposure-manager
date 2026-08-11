@@ -5,6 +5,31 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-08-11
+
+### Added
+
+- The setup and configured views now provide a guided migration path from the
+  Alexa configuration captured before managed includes are activated.
+- Recovery guidance now distinguishes retrying a managed-file read from
+  restoring old inline Alexa rules from a Home Assistant backup or starting
+  fresh with safe managed defaults.
+
+### Fixed
+
+- Alexa support detection now calls Home Assistant's Alexa adapters with the
+  expected configuration interface instead of silently marking every entity as
+  unsupported after a hidden `NameError`.
+- Missing managed files are recreated with safe empty defaults without
+  overwriting the other managed file when it still exists.
+- Empty but valid inline Alexa configurations are captured for migration, and
+  migration remains available when Home Assistant currently has no entities.
+- Configured migration errors remain visible without replacing the entity
+  manager, and a completed import reloads authoritative status and entity
+  revisions before further edits.
+- The custom panel URL now includes the integration version so Home Assistant
+  and browsers load the newly bundled frontend after an upgrade.
+
 ## [0.1.3] - 2026-08-11
 
 ### Fixed
@@ -73,6 +98,9 @@ uses semantic versioning once releases are published.
 - Home Assistant `2026.8.1` with
   `pytest-homeassistant-custom-component==0.13.355`.
 
-[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.4
+[0.1.3]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.3
+[0.1.2]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.2
 [0.1.1]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.1
 [0.1.0]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.0

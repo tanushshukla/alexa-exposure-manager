@@ -60,6 +60,12 @@ export interface StatusResponse {
   read_only_reasons?: string[];
   last_validation?: LastValidation | null;
   migration_state?: string;
+  migration_available?: boolean;
+  managed_files?: {
+    filter_created?: boolean;
+    entity_config_created?: boolean;
+    safe_defaults?: boolean;
+  };
 }
 
 export interface LastValidation {

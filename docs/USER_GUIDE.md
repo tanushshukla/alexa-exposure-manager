@@ -159,15 +159,18 @@ Take a fresh full backup before migration. Also copy your current
 `configuration.yaml`, containing Alexa YAML, and any files included by the old
 filter or entity configuration.
 
-1. Open Alexa Exposure Manager after activation.
-2. Select the offered migration preview.
-3. Review the exposed, hidden, unsupported, and missing entity counts.
-4. Review the inferred **Expose new entities** setting.
-5. Review preserved Alexa names, descriptions, display categories, and explicit
+1. Restart Home Assistant once while the old filter and entity configuration
+   are still inline so Alexa Exposure Manager can capture them.
+2. Open Alexa Exposure Manager before or after activating the managed includes.
+3. Select the offered migration preview.
+4. Review the exposed, hidden, unsupported, and missing entity counts.
+5. Review the inferred **Expose new entities** setting.
+6. Review preserved Alexa names, descriptions, display categories, and explicit
    missing entity IDs.
-6. Confirm migration only when the preview matches your current effective
+7. Confirm migration only when the preview matches your current effective
    exposure.
-7. Save, validate, restart, and run Alexa discovery.
+8. Activate the managed includes if necessary, validate, restart, and run Alexa
+   discovery.
 
 Migration evaluates your legacy filter using Home Assistant's actual
 `EntityFilter` precedence. It flattens entity, domain, and glob rules into a
@@ -181,6 +184,13 @@ and migration flattens that captured copy. The preview states which source it
 used and when it was captured. If you have already saved exposure changes
 through the panel, migration refuses rather than overwrite them; re-check your
 Alexa YAML and reload the page before importing.
+
+If no snapshot was captured and the old Alexa YAML has already been deleted,
+the exact domain, glob, entity, and metadata rules cannot be reconstructed from
+Alexa's discovered-device list. Restore the old inline configuration from a
+Home Assistant or file backup and restart once to capture it. If no backup
+exists, use the manager's current entity list to create a new exposure
+configuration from scratch.
 
 Entities in domains Alexa cannot control, such as `select`, `calendar`, and
 `notify`, are counted as unsupported and are not imported. Configured entity IDs
