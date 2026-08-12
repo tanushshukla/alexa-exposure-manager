@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import ast
 import asyncio
 from pathlib import Path
 
+import homeassistant
 import pytest
+import yaml
+from homeassistant.helpers.entityfilter import FILTER_SCHEMA
 
+from custom_components.alexa_exposure_manager.const import DISPLAY_CATEGORIES
 from custom_components.alexa_exposure_manager.managed_files import (
     InvalidManagedConfigurationError,
     ManagedFilesError,
     ManagedFileTransaction,
     ManagedYamlReadOnlyError,
     RevisionConflictError,
+    SemanticVerificationFailedError,
     ValidationFailedError,
 )
 
@@ -25,6 +31,343 @@ async def valid_config() -> str | None:
 
 def transaction(tmp_path: Path, validator=valid_config) -> ManagedFileTransaction:
     return ManagedFileTransaction(tmp_path, run_blocking, validator)
+
+
+def mixed_fixture() -> tuple[dict[str, object], dict[str, object]]:
+    fixture_path = (
+        Path(__file__).parents[1] / "fixtures" / "alexa" / "mixed_rules" / "alexa.yaml"
+    )
+    smart_home = yaml.safe_load(fixture_path.read_text())["smart_home"]
+    return smart_home["filter"], smart_home.get("entity_config", {})
+
+
+@pytest.mark.asyncio
+async def test_mixed_filter_rules_are_editable_and_preserved(tmp_path: Path) -> None:
+    filter_config, entity_config = mixed_fixture()
+    (tmp_path / "alexa_exposure_filter.yaml").write_text(
+        yaml.safe_dump(filter_config, sort_keys=False)
+    )
+    (tmp_path / "alexa_entity_config.yaml").write_text(
+        yaml.safe_dump(entity_config, sort_keys=False)
+    )
+    managed = transaction(tmp_path)
+    entity_ids = {
+        "script.start_movie_time",
+        "automation.voice_daily_summary",
+        "light.kitchen",
+        "sensor.utility_rate",
+        "switch.voice_receiver",
+        "weather.local",
+    }
+    snapshot = await managed.async_read(entity_ids)
+
+    assert snapshot["read_only"] is False
+    assert snapshot["strategy"] == "rule_based"
+    assert snapshot["filter"] == filter_config
+    entity_filter = FILTER_SCHEMA(filter_config)
+    configured_entity_ids = {
+        entity_id
+        for key in ("include_entities", "exclude_entities")
+        for entity_id in filter_config.get(key, [])
+    } | set(entity_config)
+    assert snapshot["exposure"] == {
+        entity_id: bool(entity_filter(entity_id))
+        for entity_id in sorted(entity_ids | configured_entity_ids)
+    }
+
+
+@pytest.mark.asyncio
+async def test_import_preview_round_trips_mixed_rules_without_writing(
+    tmp_path: Path,
+) -> None:
+    filter_config, entity_config = mixed_fixture()
+    assert entity_config == {
+        "script.start_movie_time": {
+            "name": "Movie time",
+            "description": "Starts the shared movie scene",
+            "display_categories": "ACTIVITY_TRIGGER",
+        },
+        "sensor.utility_rate": {"description": "Current utility rate"},
+        "switch.removed_device": {"name": "Retired voice switch"},
+    }
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    before_filter = (tmp_path / "alexa_exposure_filter.yaml").read_bytes()
+    before_entities = (tmp_path / "alexa_entity_config.yaml").read_bytes()
+
+    preview = await managed.async_import_preview(
+        filter_config=filter_config,
+        entity_config=entity_config,
+    )
+
+    assert preview["strategy"] == "rule_based"
+    assert yaml.safe_load(preview["filter_yaml"]) == filter_config
+    assert (yaml.safe_load(preview["entity_config_yaml"]) or {}) == entity_config
+    assert (tmp_path / "alexa_exposure_filter.yaml").read_bytes() == before_filter
+    assert (tmp_path / "alexa_entity_config.yaml").read_bytes() == before_entities
+
+
+@pytest.mark.asyncio
+async def test_import_save_commits_and_verifies_complete_mixed_rules(
+    tmp_path: Path,
+) -> None:
+    filter_config, entity_config = mixed_fixture()
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    preview = await managed.async_import_preview(
+        filter_config=filter_config,
+        entity_config=entity_config,
+    )
+
+    saved = await managed.async_import_save(
+        expected_revision=preview["revision"],
+        expected_entities_revision=preview["entities_revision"],
+        filter_config=filter_config,
+        entity_config=entity_config,
+    )
+
+    assert saved["restart_required"] is True
+    assert saved["strategy"] == "rule_based"
+    assert yaml.safe_load((tmp_path / "alexa_exposure_filter.yaml").read_text()) == (
+        filter_config
+    )
+    assert (
+        yaml.safe_load((tmp_path / "alexa_entity_config.yaml").read_text()) or {}
+    ) == entity_config
+    snapshot = await managed.async_read(
+        {"light.future", "sensor.future_rssi", "weather.future"}
+    )
+    entity_filter = FILTER_SCHEMA(filter_config)
+    assert snapshot["exposure"]["light.future"] is bool(entity_filter("light.future"))
+    assert snapshot["exposure"]["sensor.future_rssi"] is bool(
+        entity_filter("sensor.future_rssi")
+    )
+    assert snapshot["exposure"]["weather.future"] is bool(
+        entity_filter("weather.future")
+    )
+
+
+@pytest.mark.asyncio
+async def test_semantic_verification_rollback_failure_records_failed_validation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    preview = await managed.async_import_preview(
+        filter_config={"include_entities": ["light.one"]},
+        entity_config={},
+    )
+    real_read_pair = managed._read_pair
+    read_calls = 0
+
+    def mismatched_read_pair():
+        nonlocal read_calls
+        read_calls += 1
+        parsed = real_read_pair()
+        if read_calls >= 2:
+            parsed.filter = {"include_entities": ["light.other"]}
+        return parsed
+
+    real_replace_pair = managed._replace_bytes_pair
+    replace_calls = 0
+
+    def fail_rollback(filter_bytes, entity_bytes):
+        nonlocal replace_calls
+        replace_calls += 1
+        if replace_calls >= 2:
+            raise OSError("simulated rollback failure")
+        real_replace_pair(filter_bytes, entity_bytes)
+
+    monkeypatch.setattr(managed, "_read_pair", mismatched_read_pair)
+    monkeypatch.setattr(managed, "_replace_bytes_pair", fail_rollback)
+
+    with pytest.raises(SemanticVerificationFailedError, match="rollback failed"):
+        await managed.async_import_save(
+            expected_revision=preview["revision"],
+            expected_entities_revision=preview["entities_revision"],
+            filter_config={"include_entities": ["light.one"]},
+            entity_config={},
+        )
+
+    assert managed.last_validation is not None
+    assert managed.last_validation["ok"] is False
+    assert managed.last_validation["rollback"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_rule_based_entity_edits_preserve_domain_and_glob_rules(
+    tmp_path: Path,
+) -> None:
+    filter_config, entity_config = mixed_fixture()
+    (tmp_path / "alexa_exposure_filter.yaml").write_text(
+        yaml.safe_dump(filter_config, sort_keys=False)
+    )
+    (tmp_path / "alexa_entity_config.yaml").write_text(
+        yaml.safe_dump(entity_config, sort_keys=False)
+    )
+    managed = transaction(tmp_path)
+    snapshot = await managed.async_read(
+        {"light.kitchen", "sensor.kitchen_rssi", "weather.local"}
+    )
+
+    await managed.async_save(
+        expected_revision=snapshot["revision"],
+        expected_entities_revision=snapshot["entities_revision"],
+        expose_new_entities=snapshot["expose_new_entities"],
+        entities=[
+            {"entity_id": "light.kitchen", "exposed": False},
+            {"entity_id": "sensor.kitchen_rssi", "exposed": True},
+            {"entity_id": "weather.local", "exposed": True},
+        ],
+        known_entity_ids={"light.kitchen", "sensor.kitchen_rssi", "weather.local"},
+    )
+
+    saved_filter = yaml.safe_load((tmp_path / "alexa_exposure_filter.yaml").read_text())
+    assert saved_filter["exclude_domains"] == filter_config["exclude_domains"]
+    assert saved_filter["exclude_entity_globs"] == filter_config["exclude_entity_globs"]
+    assert set(saved_filter["include_entities"]) == set(
+        filter_config["include_entities"]
+    ) | {"sensor.kitchen_rssi", "weather.local"}
+    assert set(saved_filter["exclude_entities"]) == set(
+        filter_config["exclude_entities"]
+    ) | {"light.kitchen"}
+
+
+@pytest.mark.asyncio
+async def test_six_section_filter_with_empty_includes_uses_native_excludes(
+    tmp_path: Path,
+) -> None:
+    filter_config = {
+        "include_entities": [],
+        "include_domains": [],
+        "include_entity_globs": [],
+        "exclude_entities": ["light.secret"],
+        "exclude_domains": [],
+        "exclude_entity_globs": [],
+    }
+    (tmp_path / "alexa_exposure_filter.yaml").write_text(
+        yaml.safe_dump(filter_config, sort_keys=False)
+    )
+    (tmp_path / "alexa_entity_config.yaml").write_text("{}\n")
+
+    snapshot = await transaction(tmp_path).async_read({"light.public", "light.secret"})
+
+    assert snapshot["strategy"] == "rule_based"
+    assert snapshot["exposure"] == {
+        "light.public": True,
+        "light.secret": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_empty_native_filter_is_reported_as_registry_default(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "alexa_exposure_filter.yaml").write_text("{}\n")
+    (tmp_path / "alexa_entity_config.yaml").write_text("{}\n")
+
+    snapshot = await transaction(tmp_path).async_read({"light.one"})
+
+    assert snapshot["strategy"] == "registry_default"
+    assert snapshot["filter_empty"] is True
+
+
+@pytest.mark.asyncio
+async def test_metadata_only_rule_edit_preserves_entity_filter_case(
+    tmp_path: Path,
+) -> None:
+    original_filter = {
+        "include_entities": ["light.only"],
+        "exclude_entities": ["light.secret"],
+    }
+    (tmp_path / "alexa_exposure_filter.yaml").write_text(
+        yaml.safe_dump(original_filter, sort_keys=False)
+    )
+    (tmp_path / "alexa_entity_config.yaml").write_text("{}\n")
+    managed = transaction(tmp_path)
+    snapshot = await managed.async_read({"light.only", "light.other", "light.secret"})
+
+    await managed.async_save(
+        expected_revision=snapshot["revision"],
+        expected_entities_revision=snapshot["entities_revision"],
+        expose_new_entities=False,
+        entities=[
+            {
+                "entity_id": "light.only",
+                "exposed": True,
+                "name": "Only light",
+            }
+        ],
+        known_entity_ids={"light.only", "light.other", "light.secret"},
+    )
+
+    assert yaml.safe_load((tmp_path / "alexa_exposure_filter.yaml").read_text()) == (
+        original_filter
+    )
+
+
+@pytest.mark.asyncio
+async def test_rule_edit_rejects_removing_last_include_when_defaults_would_change(
+    tmp_path: Path,
+) -> None:
+    original_text = (
+        "include_entities:\n  - light.only\nexclude_entities:\n  - light.secret\n"
+    )
+    (tmp_path / "alexa_exposure_filter.yaml").write_text(original_text)
+    (tmp_path / "alexa_entity_config.yaml").write_text("{}\n")
+    managed = transaction(tmp_path)
+    snapshot = await managed.async_read({"light.only", "light.other", "light.secret"})
+
+    with pytest.raises(InvalidManagedConfigurationError, match="unrelated"):
+        await managed.async_save(
+            expected_revision=snapshot["revision"],
+            expected_entities_revision=snapshot["entities_revision"],
+            expose_new_entities=False,
+            entities=[{"entity_id": "light.only", "exposed": False}],
+            known_entity_ids={"light.only", "light.other", "light.secret"},
+        )
+
+    assert (tmp_path / "alexa_exposure_filter.yaml").read_text() == original_text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "changes",
+    [
+        [
+            {"entity_id": "light.a", "exposed": False},
+            {"entity_id": "light.b", "exposed": True},
+        ],
+        [
+            {"entity_id": "light.b", "exposed": True},
+            {"entity_id": "light.a", "exposed": False},
+        ],
+    ],
+)
+async def test_multi_entity_rule_edits_are_independent_of_staging_order(
+    tmp_path: Path, changes: list[dict[str, object]]
+) -> None:
+    (tmp_path / "alexa_exposure_filter.yaml").write_text(
+        "include_entities:\n  - light.a\nexclude_entities:\n  - light.b\n"
+    )
+    (tmp_path / "alexa_entity_config.yaml").write_text("{}\n")
+    managed = transaction(tmp_path)
+    snapshot = await managed.async_read({"light.a", "light.b", "light.other"})
+
+    await managed.async_save(
+        expected_revision=snapshot["revision"],
+        expected_entities_revision=snapshot["entities_revision"],
+        expose_new_entities=False,
+        entities=changes,
+        known_entity_ids={"light.a", "light.b", "light.other"},
+    )
+
+    reloaded = await managed.async_read({"light.a", "light.b", "light.other"})
+    assert reloaded["exposure"] == {
+        "light.a": False,
+        "light.b": True,
+        "light.other": False,
+    }
 
 
 @pytest.mark.asyncio
@@ -52,7 +395,9 @@ async def test_read_recreates_managed_files_deleted_after_setup(tmp_path: Path) 
     assert snapshot["expose_new_entities"] is False
     assert snapshot["exposure"] == {"light.kitchen": False}
     assert (tmp_path / "alexa_exposure_filter.yaml").read_text() == (
-        "# Managed by Alexa Exposure Manager.\ninclude_entities: []\n"
+        "# Managed by Alexa Exposure Manager.\n"
+        "include_entity_globs:\n"
+        "  - __alexa_exposure_manager_never_match__.*\n"
     )
     assert (tmp_path / "alexa_entity_config.yaml").read_text() == "{}\n"
 
@@ -293,7 +638,9 @@ async def test_stale_revision_rejects_both_file_write(tmp_path: Path) -> None:
         )
 
     assert (tmp_path / "alexa_exposure_filter.yaml").read_text() == (
-        "# Managed by Alexa Exposure Manager.\ninclude_entities: []\n"
+        "# Managed by Alexa Exposure Manager.\n"
+        "include_entity_globs:\n"
+        "  - __alexa_exposure_manager_never_match__.*\n"
     )
 
 
@@ -403,11 +750,9 @@ async def test_backup_retention_keeps_latest_five_pairs(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "filter_yaml",
     [
-        "include_domains:\n  - light\n",
         "include_entities: &lights\n  - light.one\n",
         "include_entities: !secret exposed_entities\n",
         "include_entities:\n  - 42\n",
-        "include_entities:\n  - light.one\nexclude_entities:\n  - light.two\n",
     ],
 )
 async def test_unknown_or_lossy_yaml_is_read_only(
@@ -456,7 +801,9 @@ async def test_restore_uses_same_revision_and_validation_transaction(
     assert (
         (tmp_path / "alexa_exposure_filter.yaml")
         .read_text()
-        .endswith("include_entities: []\n")
+        .endswith(
+            "include_entity_globs:\n  - __alexa_exposure_manager_never_match__.*\n"
+        )
     )
 
 
@@ -521,6 +868,45 @@ async def test_single_display_category_is_written_as_scalar_for_ha_yaml_schema(
     assert (tmp_path / "alexa_entity_config.yaml").read_text() == (
         "light.one:\n  display_categories: LIGHT\n"
     )
+
+
+@pytest.mark.asyncio
+async def test_import_accepts_every_home_assistant_display_category(
+    tmp_path: Path,
+) -> None:
+    managed = transaction(tmp_path)
+    await managed.async_initialize()
+    entities_path = (
+        Path(homeassistant.__file__).parent / "components" / "alexa" / "entities.py"
+    )
+    module = ast.parse(entities_path.read_text())
+    display_category = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.ClassDef) and node.name == "DisplayCategory"
+    )
+    categories = {
+        node.value.value
+        for node in display_category.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id.isupper()
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    }
+    assert DISPLAY_CATEGORIES == categories
+
+    for category in sorted(categories):
+        preview = await managed.async_import_preview(
+            filter_config={"include_entities": ["light.one"]},
+            entity_config={
+                "light.one": {"display_categories": category},
+            },
+        )
+        assert yaml.safe_load(preview["entity_config_yaml"]) == {
+            "light.one": {"display_categories": category}
+        }
 
 
 @pytest.mark.asyncio

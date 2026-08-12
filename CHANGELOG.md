@@ -5,6 +5,36 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-12
+
+### Added
+
+- Migration previews now inventory and preserve all six native Home Assistant
+  Alexa filter sections: included and excluded entities, domains, and entity
+  globs.
+- The panel distinguishes simple allowlist and blocklist configurations from
+  mixed rule-based filters and Home Assistant's empty registry-default filter.
+- Status now reports whether the running Alexa configuration matches the saved
+  managed files, making pending restart state explicit.
+
+### Fixed
+
+- Migration now copies the complete Alexa filter and `entity_config` without
+  flattening domain and glob rules into the entities currently in the registry.
+  Missing IDs, unmatched future rules, ordering, and duplicate list entries are
+  retained.
+- Migration preview no longer writes persisted migration state. Confirmation
+  revision-checks, renders, validates, re-reads, semantically verifies, and
+  rolls back both managed files on failure.
+- Entity edits on rule-based filters are stored as explicit entity exceptions
+  while preserving domain and glob rules. Unsafe edits that would change
+  unrelated entities are rejected.
+- Fresh managed files now use a nonmatching include glob so new installations
+  remain opt-in without being mistaken for Home Assistant's empty
+  registry-default filter.
+- Unexpected WebSocket failures now return structured errors while keeping
+  private traceback details in Home Assistant logs.
+
 ## [0.1.6] - 2026-08-11
 
 ### Fixed
@@ -121,7 +151,8 @@ uses semantic versioning once releases are published.
 - Home Assistant `2026.8.1` with
   `pytest-homeassistant-custom-component==0.13.355`.
 
-[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.7
 [0.1.6]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.6
 [0.1.5]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.5
 [0.1.4]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.4

@@ -30,8 +30,22 @@ Executor = Callable[..., Awaitable[Any]]
 Validator = Callable[[], Awaitable[str | None]]
 
 _ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
-_FILTER_KEYS = frozenset({"include_entities", "exclude_entities"})
+_DOMAIN = re.compile(r"^[a-z0-9_]+$")
+_FILTER_KEYS = (
+    "include_entities",
+    "include_domains",
+    "include_entity_globs",
+    "exclude_entities",
+    "exclude_domains",
+    "exclude_entity_globs",
+)
+_FILTER_KEY_SET = frozenset(_FILTER_KEYS)
+_ENTITY_FILTER_KEYS = frozenset({"include_entities", "exclude_entities"})
+_DOMAIN_FILTER_KEYS = frozenset({"include_domains", "exclude_domains"})
 _ENTITY_CONFIG_KEYS = frozenset({"name", "description", "display_categories"})
+_SAFE_DEFAULT_GLOB = "__alexa_exposure_manager_never_match__.*"
+_SAFE_DEFAULT_FILTER = {"include_entity_globs": [_SAFE_DEFAULT_GLOB]}
+_SAFE_BLOCKLIST_FILTER = {"exclude_entity_globs": [_SAFE_DEFAULT_GLOB]}
 
 
 class _IndentedSafeDumper(yaml.SafeDumper):
@@ -57,6 +71,10 @@ class ValidationFailedError(ManagedFilesError):
     """Raised when Home Assistant rejects the complete configuration."""
 
 
+class SemanticVerificationFailedError(ManagedFilesError):
+    """Raised when saved YAML differs from the configuration being imported."""
+
+
 class BackupNotFoundError(ManagedFilesError):
     """Raised when a requested backup pair does not exist."""
 
@@ -67,6 +85,8 @@ class InvalidManagedConfigurationError(ManagedFilesError):
 
 @dataclass(slots=True)
 class _ParsedPair:
+    filter: dict[str, list[str]]
+    strategy: str
     expose_new_entities: bool
     filter_entities: set[str]
     entity_config: dict[str, dict[str, Any]]
@@ -76,7 +96,11 @@ class _ParsedPair:
 
     @property
     def configured_entity_ids(self) -> set[str]:
-        return self.filter_entities | set(self.entity_config)
+        return {
+            entity_id
+            for key in _ENTITY_FILTER_KEYS
+            for entity_id in self.filter.get(key, [])
+        } | set(self.entity_config)
 
 
 class ManagedFileTransaction:
@@ -138,6 +162,30 @@ class ManagedFileTransaction:
             "entity_config_yaml": entity_text,
         }
 
+    async def async_import_preview(
+        self,
+        *,
+        filter_config: Mapping[str, Any],
+        entity_config: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Render a complete Alexa source pair without changing managed files."""
+        current = await self._executor(self._read_pair)
+        if current.read_only_reasons:
+            raise ManagedYamlReadOnlyError("; ".join(current.read_only_reasons))
+        imported, filter_text, entity_text = await self._executor(
+            self._validated_import_pair, filter_config, entity_config
+        )
+        return {
+            "revision": current.revision,
+            "entities_revision": current.entities_revision,
+            "strategy": imported.strategy,
+            "expose_new_entities": imported.expose_new_entities,
+            "filter": imported.filter,
+            "entity_config": imported.entity_config,
+            "filter_yaml": filter_text,
+            "entity_config_yaml": entity_text,
+        }
+
     async def async_save(
         self,
         *,
@@ -170,6 +218,39 @@ class ManagedFileTransaction:
                     "Home Assistant rejected the configuration and automatic rollback "
                     "failed"
                 ),
+            )
+
+    async def async_import_save(
+        self,
+        *,
+        expected_revision: str,
+        expected_entities_revision: str,
+        filter_config: Mapping[str, Any],
+        entity_config: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Atomically import and verify a complete Alexa source pair."""
+        async with self._lock:
+            current = await self._executor(self._read_pair)
+            self._check_revisions(
+                current, expected_revision, expected_entities_revision
+            )
+            if current.read_only_reasons:
+                raise ManagedYamlReadOnlyError("; ".join(current.read_only_reasons))
+            imported, filter_text, entity_text = await self._executor(
+                self._validated_import_pair, filter_config, entity_config
+            )
+            return await self._async_commit_bytes(
+                filter_text.encode(),
+                entity_text.encode(),
+                write_error=(
+                    "Alexa import write failed; the previous files were restored"
+                ),
+                rollback_error_prefix=(
+                    "Home Assistant rejected the imported configuration and automatic "
+                    "rollback failed"
+                ),
+                expected_filter=imported.filter,
+                expected_entity_config=imported.entity_config,
             )
 
     async def async_list_backups(self) -> list[dict[str, Any]]:
@@ -212,6 +293,8 @@ class ManagedFileTransaction:
         *,
         write_error: str,
         rollback_error_prefix: str,
+        expected_filter: Mapping[str, list[str]] | None = None,
+        expected_entity_config: Mapping[str, Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Backup, replace, validate, and roll back both managed files together."""
         old_filter, old_entities = await self._executor(self._read_bytes_pair)
@@ -250,9 +333,40 @@ class ManagedFileTransaction:
             "at": self._now(),
         }
         saved = await self._executor(self._read_pair)
+        if (
+            saved.read_only_reasons
+            or expected_filter is not None
+            and saved.filter != expected_filter
+            or expected_entity_config is not None
+            and saved.entity_config != expected_entity_config
+        ):
+            try:
+                await self._executor(self._replace_bytes_pair, old_filter, old_entities)
+            except OSError as rollback_error:
+                self.last_validation = {
+                    "ok": False,
+                    "error": "Saved Alexa YAML did not match the migration source",
+                    "rollback": "failed",
+                    "at": self._now(),
+                }
+                raise SemanticVerificationFailedError(
+                    "The imported Alexa files changed after writing and automatic "
+                    f"rollback failed: {rollback_error}"
+                ) from rollback_error
+            self.last_validation = {
+                "ok": False,
+                "error": "Saved Alexa YAML did not match the migration source",
+                "rollback": "complete",
+                "at": self._now(),
+            }
+            raise SemanticVerificationFailedError(
+                "Saved Alexa YAML did not match the migration source; the previous "
+                "files were restored"
+            )
         return {
             "revision": saved.revision,
             "entities_revision": saved.entities_revision,
+            "strategy": saved.strategy,
             "expose_new_entities": saved.expose_new_entities,
             "restart_required": True,
             "last_validation": self.last_validation,
@@ -270,10 +384,73 @@ class ManagedFileTransaction:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         created_filter = self._create_if_missing(
             self.filter_path,
-            self._render_filter(False, set()).encode(),
+            self._render_filter_config(_SAFE_DEFAULT_FILTER).encode(),
         )
         created_entities = self._create_if_missing(self.entity_config_path, b"{}\n")
         return {"filter": created_filter, "entity_config": created_entities}
+
+    def _validated_import_pair(
+        self,
+        filter_config: Mapping[str, Any],
+        entity_config: Mapping[str, Any],
+    ) -> tuple[_ParsedPair, str, str]:
+        if not isinstance(filter_config, Mapping) or not isinstance(
+            entity_config, Mapping
+        ):
+            raise InvalidManagedConfigurationError(
+                "Alexa filter and entity configuration must be mappings"
+            )
+        plain_filter = self._plain_yaml_value(filter_config)
+        plain_entities = self._plain_yaml_value(entity_config)
+        source_filter = yaml.dump(
+            plain_filter,
+            Dumper=_IndentedSafeDumper,
+            allow_unicode=True,
+            default_flow_style=False,
+            sort_keys=False,
+        ).encode()
+        source_entities = yaml.dump(
+            plain_entities,
+            Dumper=_IndentedSafeDumper,
+            allow_unicode=True,
+            default_flow_style=False,
+            sort_keys=False,
+        ).encode()
+        imported = self._parse_pair(source_filter, source_entities)
+        if imported.read_only_reasons:
+            raise InvalidManagedConfigurationError(
+                "; ".join(imported.read_only_reasons)
+            )
+        filter_text = self._render_filter_config(imported.filter)
+        entity_text = self._render_entity_config(imported.entity_config)
+        rendered = self._parse_pair(filter_text.encode(), entity_text.encode())
+        if (
+            rendered.read_only_reasons
+            or rendered.filter != imported.filter
+            or rendered.entity_config != imported.entity_config
+        ):
+            raise InvalidManagedConfigurationError(
+                "Alexa configuration could not be rendered without semantic changes"
+            )
+        return imported, filter_text, entity_text
+
+    @staticmethod
+    def _plain_yaml_value(value: Any) -> Any:
+        """Remove Home Assistant YAML scalar subclasses before safe rendering."""
+        if isinstance(value, Mapping):
+            return {
+                str(key): ManagedFileTransaction._plain_yaml_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [ManagedFileTransaction._plain_yaml_value(item) for item in value]
+        if isinstance(value, str):
+            return str(value)
+        if isinstance(value, int | float | bool) or value is None:
+            return value
+        raise InvalidManagedConfigurationError(
+            f"Alexa configuration contains unsupported value {value!r}"
+        )
 
     @staticmethod
     def _create_if_missing(path: Path, content: bytes) -> bool:
@@ -305,30 +482,65 @@ class ManagedFileTransaction:
         filter_data = self._safe_mapping(filter_text, "filter", reasons)
         entity_data = self._safe_mapping(entity_text, "entity configuration", reasons)
 
-        unknown_filter_keys = set(filter_data) - _FILTER_KEYS
+        unknown_filter_keys = set(filter_data) - _FILTER_KEY_SET
         if unknown_filter_keys:
             reasons.append(
                 "The filter contains unknown keys: "
                 + ", ".join(sorted(map(str, unknown_filter_keys)))
             )
 
-        present_filter_keys = set(filter_data) & _FILTER_KEYS
-        if len(present_filter_keys) > 1:
-            reasons.append(
-                "The filter contains both include_entities and exclude_entities"
+        parsed_filter: dict[str, list[str]] = {}
+        for key in _FILTER_KEYS:
+            if key not in filter_data:
+                continue
+            validator = (
+                _ENTITY_ID
+                if key in _ENTITY_FILTER_KEYS
+                else _DOMAIN
+                if key in _DOMAIN_FILTER_KEYS
+                else None
+            )
+            parsed_filter[key] = self._string_filter_list(
+                filter_data[key], key, reasons, validator
             )
 
-        # The filter key is the only source of truth for the exposure mode:
-        # exclude_entities is a blocklist (expose new entities on), and
-        # include_entities is an allowlist (off). A file with neither key
-        # defaults to off so that Alexa access stays opt-in.
-        expose_new_entities = "exclude_entities" in present_filter_keys
-        expected_key = "exclude_entities" if expose_new_entities else "include_entities"
-
-        raw_filter_entities = filter_data.get(expected_key, [])
-        filter_entities = self._string_entity_list(
-            raw_filter_entities, expected_key, reasons
+        has_filter_values = any(parsed_filter.values())
+        include_patterns = bool(
+            parsed_filter.get("include_domains")
+            or parsed_filter.get("include_entity_globs")
         )
+        exclude_patterns = bool(
+            parsed_filter.get("exclude_domains")
+            or parsed_filter.get("exclude_entity_globs")
+        )
+        has_rule_sections = any(
+            key in parsed_filter for key in _FILTER_KEY_SET - _ENTITY_FILTER_KEYS
+        )
+        if parsed_filter == _SAFE_DEFAULT_FILTER:
+            strategy = "allowlist"
+        elif parsed_filter == _SAFE_BLOCKLIST_FILTER:
+            strategy = "blocklist"
+        elif not has_filter_values:
+            strategy = "registry_default"
+        elif has_rule_sections or (
+            "include_entities" in parsed_filter and "exclude_entities" in parsed_filter
+        ):
+            strategy = "rule_based"
+        elif (
+            "exclude_entities" in parsed_filter
+            and "include_entities" not in parsed_filter
+        ):
+            strategy = "blocklist"
+        else:
+            strategy = "allowlist"
+
+        # This compatibility value is the result for an otherwise unmatched
+        # entity. Rule-based filters retain their native rules separately.
+        expose_new_entities = bool(
+            exclude_patterns and not include_patterns or strategy == "blocklist"
+        )
+        expected_key = "exclude_entities" if expose_new_entities else "include_entities"
+        filter_entities = set(parsed_filter.get(expected_key, []))
 
         parsed_entity_config: dict[str, dict[str, Any]] = {}
         for raw_entity_id, raw_metadata in entity_data.items():
@@ -386,6 +598,8 @@ class ManagedFileTransaction:
             parsed_entity_config[raw_entity_id] = metadata
 
         return _ParsedPair(
+            filter=parsed_filter,
+            strategy=strategy,
             expose_new_entities=expose_new_entities,
             filter_entities=filter_entities,
             entity_config=parsed_entity_config,
@@ -423,16 +637,24 @@ class ManagedFileTransaction:
         return value
 
     @staticmethod
-    def _string_entity_list(value: Any, key: str, reasons: list[str]) -> set[str]:
+    def _string_filter_list(
+        value: Any,
+        key: str,
+        reasons: list[str],
+        validator: re.Pattern[str] | None,
+    ) -> list[str]:
         if not isinstance(value, list):
             reasons.append(f"{key} must be a list")
-            return set()
-        result: set[str] = set()
-        for entity_id in value:
-            if not isinstance(entity_id, str) or not _ENTITY_ID.fullmatch(entity_id):
-                reasons.append(f"{key} contains an invalid entity ID: {entity_id!r}")
+            return []
+        result: list[str] = []
+        for item in value:
+            if not isinstance(item, str) or (
+                validator is not None and not validator.fullmatch(item)
+            ):
+                kind = "entity ID" if validator is _ENTITY_ID else "domain"
+                reasons.append(f"{key} contains an invalid {kind}: {item!r}")
                 continue
-            result.add(entity_id)
+            result.append(item)
         return result
 
     def _validate_categories(
@@ -470,14 +692,26 @@ class ManagedFileTransaction:
         self, parsed: _ParsedPair, known_entity_ids: set[str]
     ) -> dict[str, Any]:
         all_entity_ids = known_entity_ids | parsed.configured_entity_ids
-        exposure = self._exposure_map(
-            parsed.expose_new_entities,
-            parsed.filter_entities,
-            sorted(all_entity_ids),
-        )
+        if parsed.strategy == "rule_based":
+            from homeassistant.helpers.entityfilter import FILTER_SCHEMA
+
+            entity_filter = FILTER_SCHEMA(parsed.filter)
+            exposure = {
+                entity_id: bool(entity_filter(entity_id))
+                for entity_id in sorted(all_entity_ids)
+            }
+        else:
+            exposure = self._exposure_map(
+                parsed.expose_new_entities,
+                parsed.filter_entities,
+                sorted(all_entity_ids),
+            )
         return {
             "revision": parsed.revision,
             "entities_revision": parsed.entities_revision,
+            "filter": parsed.filter,
+            "strategy": parsed.strategy,
+            "filter_empty": not any(parsed.filter.values()),
             "expose_new_entities": parsed.expose_new_entities,
             "exposure": exposure,
             "entity_config": parsed.entity_config,
@@ -496,13 +730,24 @@ class ManagedFileTransaction:
         known_entity_ids: set[str],
     ) -> tuple[str, str, dict[str, bool], dict[str, dict[str, Any]]]:
         universe = known_entity_ids | parsed.configured_entity_ids
-        exposure = self._exposure_map(
-            parsed.expose_new_entities, parsed.filter_entities, universe
-        )
+        if parsed.strategy == "rule_based":
+            from homeassistant.helpers.entityfilter import FILTER_SCHEMA
+
+            entity_filter = FILTER_SCHEMA(parsed.filter)
+            exposure = {
+                entity_id: bool(entity_filter(entity_id)) for entity_id in universe
+            }
+        elif parsed.strategy == "registry_default":
+            exposure = {entity_id: False for entity_id in universe}
+        else:
+            exposure = self._exposure_map(
+                parsed.expose_new_entities, parsed.filter_entities, universe
+            )
         entity_config = {
             entity_id: dict(metadata)
             for entity_id, metadata in parsed.entity_config.items()
         }
+        original_exposure = dict(exposure)
         removed_entity_ids: set[str] = set()
 
         for entity in entities:
@@ -570,9 +815,93 @@ class ManagedFileTransaction:
         # from the filter. That works for live entities but erases configured IDs
         # Home Assistant no longer knows, so retain those in the entity
         # configuration until they are explicitly removed.
-        for entity_id in universe - known_entity_ids - removed_entity_ids:
-            if exposure.get(entity_id) == expose_new_entities:
-                entity_config.setdefault(entity_id, {})
+        if parsed.strategy != "rule_based":
+            for entity_id in universe - known_entity_ids - removed_entity_ids:
+                if exposure.get(entity_id) == expose_new_entities:
+                    entity_config.setdefault(entity_id, {})
+
+        if parsed.strategy == "rule_based":
+            if expose_new_entities != parsed.expose_new_entities:
+                raise InvalidManagedConfigurationError(
+                    "Rule-based filters cannot be converted to allowlist or blocklist "
+                    "during a normal save"
+                )
+            filter_config = {key: list(values) for key, values in parsed.filter.items()}
+            remove_ids = {
+                str(entity["entity_id"])
+                for entity in entities
+                if entity.get("remove") is True
+            }
+            exposure_changes = {
+                str(entity["entity_id"]): bool(entity["exposed"])
+                for entity in entities
+                if entity.get("remove") is not True
+                and "exposed" in entity
+                and bool(entity["exposed"])
+                != original_exposure.get(str(entity["entity_id"]))
+            }
+            for entity_id in remove_ids | set(exposure_changes):
+                for key in _ENTITY_FILTER_KEYS:
+                    filter_config[key] = [
+                        value
+                        for value in filter_config.get(key, [])
+                        if value != entity_id
+                    ]
+
+            has_patterns = bool(
+                filter_config.get("include_domains")
+                or filter_config.get("include_entity_globs")
+                or filter_config.get("exclude_domains")
+                or filter_config.get("exclude_entity_globs")
+            )
+            if not has_patterns and parsed.filter.get("include_entities"):
+                for entity_id, desired in exposure_changes.items():
+                    key = "include_entities" if desired else "exclude_entities"
+                    filter_config.setdefault(key, []).append(entity_id)
+            else:
+                from homeassistant.helpers.entityfilter import FILTER_SCHEMA
+
+                inherited_filter = FILTER_SCHEMA(filter_config)
+                for entity_id, desired in exposure_changes.items():
+                    if bool(inherited_filter(entity_id)) != desired:
+                        key = "include_entities" if desired else "exclude_entities"
+                        filter_config.setdefault(key, []).append(entity_id)
+
+            if (
+                not has_patterns
+                and parsed.filter.get("include_entities")
+                and not filter_config.get("include_entities")
+            ):
+                raise InvalidManagedConfigurationError(
+                    "This edit would change the default behavior for unrelated Alexa "
+                    "entities; convert the filter strategy explicitly instead"
+                )
+
+            entity_filter = FILTER_SCHEMA(filter_config)
+            final_exposure = {
+                entity_id: bool(entity_filter(entity_id))
+                for entity_id in sorted(universe)
+            }
+            changed_ids = remove_ids | set(exposure_changes)
+            if any(
+                final_exposure.get(entity_id) != was_exposed
+                for entity_id, was_exposed in original_exposure.items()
+                if entity_id not in changed_ids
+            ):
+                raise InvalidManagedConfigurationError(
+                    "This edit would change Alexa exposure for unrelated entities"
+                )
+            if any(
+                final_exposure.get(entity_id) != desired
+                for entity_id, desired in exposure_changes.items()
+            ):
+                raise InvalidManagedConfigurationError(
+                    "The requested Alexa exposure changes cannot be represented "
+                    "without changing the filter strategy"
+                )
+            filter_text = self._render_filter_config(filter_config)
+            entity_text = self._render_entity_config(entity_config)
+            return filter_text, entity_text, final_exposure, entity_config
 
         represented = {
             entity_id
@@ -587,8 +916,21 @@ class ManagedFileTransaction:
     def _render_filter(expose_new_entities: bool, entity_ids: set[str]) -> str:
         # exclude_entities means new entities are exposed; include_entities
         # means they are hidden. The key alone carries the mode.
+        if not entity_ids:
+            return ManagedFileTransaction._render_filter_config(
+                _SAFE_BLOCKLIST_FILTER if expose_new_entities else _SAFE_DEFAULT_FILTER
+            )
         key = "exclude_entities" if expose_new_entities else "include_entities"
         data = {key: sorted(entity_ids)}
+        return ManagedFileTransaction._render_filter_config(data)
+
+    @staticmethod
+    def _render_filter_config(filter_config: Mapping[str, list[str]]) -> str:
+        data = {
+            key: list(filter_config[key])
+            for key in _FILTER_KEYS
+            if key in filter_config
+        }
         return "# Managed by Alexa Exposure Manager.\n" + yaml.dump(
             data,
             Dumper=_IndentedSafeDumper,

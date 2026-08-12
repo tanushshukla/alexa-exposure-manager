@@ -26,6 +26,14 @@ from .managed_files import (
     ManagedFileTransaction,
 )
 
+_SAFE_DEFAULT_FILTER = {
+    "include_entity_globs": ["__alexa_exposure_manager_never_match__.*"]
+}
+_EMPTY_MANAGED_FILTERS: tuple[dict[str, list[str]], ...] = (
+    _SAFE_DEFAULT_FILTER,
+    {"include_entities": []},
+)
+
 
 class AlexaExposureManagerRuntime:
     """Coordinate activation, catalog, transactions, migration, and recovery."""
@@ -87,6 +95,8 @@ class AlexaExposureManagerRuntime:
                 (legacy_filter or legacy_metadata)
                 and not managed["read_only"]
                 and not managed["expose_new_entities"]
+                and managed.get("filter", _SAFE_DEFAULT_FILTER)
+                in _EMPTY_MANAGED_FILTERS
                 and not managed.get("exposure")
                 and not managed.get("entity_config")
                 and (
@@ -186,11 +196,24 @@ class AlexaExposureManagerRuntime:
             self.startup_alexa.get("filter_active")
             and self.startup_alexa.get("entity_config_active")
         )
+        strategy = snapshot.get(
+            "strategy",
+            "blocklist" if snapshot["expose_new_entities"] else "allowlist",
+        )
         safe_defaults = bool(
             not snapshot["read_only"]
             and not snapshot["expose_new_entities"]
+            and snapshot.get("filter", _SAFE_DEFAULT_FILTER) in _EMPTY_MANAGED_FILTERS
             and not snapshot.get("exposure")
             and not snapshot.get("entity_config")
+        )
+        active_matches_saved = bool(
+            configured
+            and snapshot.get("filter") == self.startup_alexa.get("filter", {})
+            and self._normalize_entity_config(snapshot.get("entity_config", {}))
+            == self._normalize_entity_config(
+                self.startup_alexa.get("entity_config", {})
+            )
         )
         return {
             "configured": configured,
@@ -205,6 +228,12 @@ class AlexaExposureManagerRuntime:
                 "entity_config_created": self.created_files.get("entity_config", False),
                 "safe_defaults": safe_defaults,
             },
+            "configuration_state": {
+                "active_uses_managed_files": configured,
+                "active_matches_saved": active_matches_saved,
+                "saved_valid": not snapshot["read_only"],
+                "pending_restart": bool(self._state["restart_required"]),
+            },
             "migration_available": bool(
                 self._state["migration_state"] != "complete"
                 and legacy_source["available"]
@@ -213,11 +242,22 @@ class AlexaExposureManagerRuntime:
                 "configuration_yaml": CONFIGURATION_INCLUDE,
                 "alexa_yaml": ALEXA_INCLUDE,
             },
-            "editing_enabled": configured and not snapshot["read_only"],
+            "editing_enabled": bool(
+                configured
+                and not snapshot["read_only"]
+                and strategy != "registry_default"
+            ),
+            "editing_disabled_reason": (
+                "Registry-default Alexa exposure cannot be edited losslessly; "
+                "choose an explicit filter strategy first"
+                if strategy == "registry_default"
+                else None
+            ),
             "read_only": snapshot["read_only"],
             "read_only_reasons": snapshot["read_only_reasons"],
             "revision": snapshot["revision"],
             "entities_revision": snapshot["entities_revision"],
+            "strategy": strategy,
             "expose_new_entities": snapshot["expose_new_entities"],
             "restart_required": bool(self._state["restart_required"]),
             "last_validation": (
@@ -256,14 +296,19 @@ class AlexaExposureManagerRuntime:
                 "display_categories": [],
                 "inferred_display_category": None,
                 "missing": True,
+                "default_exposed": True,
             }
 
         entities: list[dict[str, Any]] = []
         for entity_id in sorted(by_id):
             entity = by_id[entity_id]
             metadata = snapshot["entity_config"].get(entity_id, {})
-            exposed = snapshot["exposure"].get(
-                entity_id, snapshot["expose_new_entities"]
+            exposed = (
+                bool(entity.get("default_exposed", True))
+                if snapshot.get("strategy") == "registry_default"
+                else snapshot["exposure"].get(
+                    entity_id, snapshot["expose_new_entities"]
+                )
             )
             entity.update(
                 {
@@ -296,6 +341,10 @@ class AlexaExposureManagerRuntime:
         return {
             "revision": snapshot["revision"],
             "entities_revision": snapshot["entities_revision"],
+            "strategy": snapshot.get(
+                "strategy",
+                "blocklist" if snapshot["expose_new_entities"] else "allowlist",
+            ),
             "expose_new_entities": snapshot["expose_new_entities"],
             "read_only": snapshot["read_only"],
             "entities": entities,
@@ -304,6 +353,7 @@ class AlexaExposureManagerRuntime:
     async def async_preview(self, message: dict[str, Any]) -> dict[str, Any]:
         """Preview deterministic YAML for staged browser changes."""
         self._require_editing()
+        await self._require_lossless_editing_strategy()
         catalog = await self.async_entities()
         known_ids = {
             entity["entity_id"]
@@ -320,6 +370,11 @@ class AlexaExposureManagerRuntime:
         """Validate exposure support and save staged browser changes."""
         self._require_editing()
         catalog_response = await self.async_entities()
+        if catalog_response["strategy"] == "registry_default":
+            raise InvalidManagedConfigurationError(
+                "Registry-default Alexa exposure cannot be edited losslessly; "
+                "choose an explicit filter strategy first"
+            )
         catalog = {
             entity["entity_id"]: entity for entity in catalog_response["entities"]
         }
@@ -349,7 +404,7 @@ class AlexaExposureManagerRuntime:
         return result
 
     async def async_migration_preview(self) -> dict[str, Any]:
-        """Flatten the active legacy filter using HA Alexa exposure semantics."""
+        """Preview an exact transfer of the captured Alexa filter and metadata."""
         catalog_response = await self.async_entities()
         catalog = catalog_response["entities"]
         legacy_filter, legacy_metadata, legacy_source = self._legacy_source()
@@ -362,12 +417,6 @@ class AlexaExposureManagerRuntime:
                 "start fresh with the manager."
             )
         self._require_fresh_snapshot(legacy_source, catalog_response)
-        include_keys = {
-            "include_entities",
-            "include_domains",
-            "include_entity_globs",
-        }
-        expose_new_entities = not any(legacy_filter.get(key) for key in include_keys)
         current_ids = {
             entity["entity_id"] for entity in catalog if not entity["missing"]
         }
@@ -379,7 +428,6 @@ class AlexaExposureManagerRuntime:
             if isinstance(entity_id, str)
         } | set(legacy_metadata)
         missing_ids = configured_ids - current_ids
-        proposed_entities: list[Mapping[str, Any]] = []
         counts = {"exposed": 0, "hidden": 0, "unsupported": 0, "missing": 0}
         for entity in catalog:
             if entity["missing"]:
@@ -393,38 +441,12 @@ class AlexaExposureManagerRuntime:
                 counts["exposed" if exposed else "hidden"] += 1
             else:
                 counts["unsupported"] += 1
-                # Alexa has no adapter for these, and a normal save refuses to
-                # expose them. Propose only the ones carrying legacy metadata,
-                # always hidden, so that metadata survives migration.
-                if entity["entity_id"] not in legacy_metadata:
-                    continue
-                exposed = False
-            proposed_entities.append(
-                self._migration_entity(
-                    entity["entity_id"],
-                    exposed,
-                    legacy_metadata.get(entity["entity_id"]),
-                )
-            )
-        for entity_id in sorted(missing_ids):
-            counts["missing"] += 1
-            proposed_entities.append(
-                self._migration_entity(
-                    entity_id,
-                    compatibility.alexa_effective_exposure(
-                        legacy_filter,
-                        entity_id,
-                        default_exposed=True,
-                    ),
-                    legacy_metadata.get(entity_id),
-                )
-            )
+        counts["missing"] = len(missing_ids)
         preview_data = {
             "expected_revision": catalog_response["revision"],
             "expected_entities_revision": catalog_response["entities_revision"],
-            "expose_new_entities": expose_new_entities,
-            "entities": proposed_entities,
-            "known_entity_ids": sorted(current_ids),
+            "filter_config": legacy_filter,
+            "entity_config": legacy_metadata,
             "legacy_source_fingerprint": self._legacy_source_fingerprint(
                 legacy_filter, legacy_metadata
             ),
@@ -432,20 +454,25 @@ class AlexaExposureManagerRuntime:
         token = hashlib.sha256(
             json.dumps(preview_data, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
+        preview = await self.transaction.async_import_preview(
+            filter_config=legacy_filter,
+            entity_config=legacy_metadata,
+        )
         self._migration_previews[token] = preview_data
         if self._state["migration_state"] == "not_started":
+            # Preview deliberately changes no persisted state or managed file.
             self._state["migration_state"] = "previewed"
-            await self._async_save_state()
-        preview = await self.transaction.async_preview(
-            expose_new_entities=expose_new_entities,
-            entities=proposed_entities,
-            known_entity_ids=current_ids,
-        )
         return {
             "token": token,
             "counts": counts,
             "legacy_source": legacy_source,
-            "expose_new_entities": expose_new_entities,
+            "strategy": preview["strategy"],
+            "expose_new_entities": preview["expose_new_entities"],
+            "source_inventory": {
+                key: len(value) if isinstance(value, list) else 0
+                for key, value in legacy_filter.items()
+            }
+            | {"entity_config": len(legacy_metadata)},
             "revision": preview["revision"],
             "entities_revision": preview["entities_revision"],
             "filter_yaml": preview["filter_yaml"],
@@ -468,12 +495,11 @@ class AlexaExposureManagerRuntime:
                 "Migration revisions changed; create a new preview"
             )
         try:
-            result = await self.transaction.async_save(
+            result = await self.transaction.async_import_save(
                 expected_revision=preview["expected_revision"],
                 expected_entities_revision=preview["expected_entities_revision"],
-                expose_new_entities=preview["expose_new_entities"],
-                entities=preview["entities"],
-                known_entity_ids=preview["known_entity_ids"],
+                filter_config=preview["filter_config"],
+                entity_config=preview["entity_config"],
             )
         except Exception:
             await self._persist_validation_state()  # noqa: TRY302
@@ -565,6 +591,14 @@ class AlexaExposureManagerRuntime:
                 "Editing is disabled until Home Assistant loads both managed includes"
             )
 
+    async def _require_lossless_editing_strategy(self) -> None:
+        snapshot = await self.transaction.async_read()
+        if snapshot["strategy"] == "registry_default":
+            raise InvalidManagedConfigurationError(
+                "Registry-default Alexa exposure cannot be edited losslessly; "
+                "choose an explicit filter strategy first"
+            )
+
     async def _record_restart_required(self, result: dict[str, Any]) -> None:
         self._state["restart_required"] = True
         self._state["restart_revisions"] = {
@@ -600,22 +634,19 @@ class AlexaExposureManagerRuntime:
 
         return (yaml.safe_load(files[FILTER_FILENAME]) or {}) == self.startup_alexa.get(
             "filter", {}
-        ) and (
+        ) and self._normalize_entity_config(
             yaml.safe_load(files[ENTITY_CONFIG_FILENAME]) or {}
-        ) == self.startup_alexa.get("entity_config", {})
+        ) == self._normalize_entity_config(self.startup_alexa.get("entity_config", {}))
 
     @staticmethod
-    def _migration_entity(
-        entity_id: str, exposed: bool, metadata: Any
-    ) -> dict[str, Any]:
-        metadata = metadata if isinstance(metadata, dict) else {}
-        categories = metadata.get("display_categories", [])
-        if isinstance(categories, str):
-            categories = [categories]
-        return {
-            "entity_id": entity_id,
-            "exposed": exposed,
-            "name": metadata.get("name", ""),
-            "description": metadata.get("description", ""),
-            "display_categories": categories,
-        }
+    def _normalize_entity_config(value: Any) -> dict[str, Any]:
+        if not isinstance(value, Mapping):
+            return {}
+        normalized: dict[str, Any] = {}
+        for entity_id, raw_metadata in value.items():
+            metadata = dict(raw_metadata) if isinstance(raw_metadata, Mapping) else {}
+            categories = metadata.get("display_categories")
+            if isinstance(categories, str):
+                metadata["display_categories"] = [categories]
+            normalized[str(entity_id)] = metadata
+        return normalized

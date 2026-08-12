@@ -164,23 +164,25 @@ filter or entity configuration.
 2. Open Alexa Exposure Manager before or after activating the managed includes.
 3. Select the offered migration preview.
 4. Review the exposed, hidden, unsupported, and missing entity counts.
-5. Review the inferred **Expose new entities** setting.
-6. Review preserved Alexa names, descriptions, display categories, and explicit
-   missing entity IDs.
+5. Review the inventory for all six include/exclude entity, domain, and glob
+   sections.
+6. Review preserved Alexa names, descriptions, display categories, unsupported
+   entries, and explicit missing entity IDs.
 7. Confirm migration only when the preview matches your current effective
    exposure.
 8. Activate the managed includes if necessary, validate, restart, and run Alexa
    discovery.
 
 Migration evaluates your legacy filter using Home Assistant's actual
-`EntityFilter` precedence. It flattens entity, domain, and glob rules into a
-simple per-entity state. It does not rewrite the old user-owned Alexa file and
-does not change managed files merely because you opened the preview.
+`EntityFilter` precedence and copies all six rule sections without flattening.
+It also copies the complete entity configuration. It does not rewrite the old
+user-owned Alexa file and does not change managed files or persisted migration
+state merely because you opened the preview.
 
 Activation repoints `filter` and `entity_config` at the managed files, so your
 legacy rules stop being readable from the running configuration. The integration
 therefore captures your Alexa configuration on every restart until activation,
-and migration flattens that captured copy. The preview states which source it
+and migration copies that captured source. The preview states which source it
 used and when it was captured. If you have already saved exposure changes
 through the panel, migration refuses rather than overwrite them; re-check your
 Alexa YAML and reload the page before importing.
@@ -193,12 +195,16 @@ exists, use the manager's current entity list to create a new exposure
 configuration from scratch.
 
 Entities in domains Alexa cannot control, such as `select`, `calendar`, and
-`notify`, are counted as unsupported and are not imported. Configured entity IDs
-that Home Assistant no longer knows are retained and stay visible until you
-remove them explicitly.
+`notify`, are counted as unsupported. Their source rules and metadata are still
+preserved exactly, but the panel does not allow exposing an entity Alexa cannot
+control. Configured entity IDs that Home Assistant no longer knows are retained
+and stay visible until you remove them explicitly.
 
-After migration, domain and glob rule editing is not available in v1. Keep the
-old configuration backup until you have checked Alexa discovery and control.
+After migration, domain and glob rule editing is not available in v1. The panel
+labels these filters as **Rule-based** and stores entity exposure changes as
+explicit include/exclude exceptions without removing the domain or glob rules.
+Keep the old configuration backup until you have checked Alexa discovery and
+control.
 
 ## Manage Entities Normally
 
@@ -241,11 +247,11 @@ Open an entity to edit:
 
 - Alexa-facing name.
 - Description.
-- One or more ordered display categories.
+- One display category.
 
-The first display category is primary. If there is no override, the panel shows
-the category inferred by Home Assistant. Incorrect category overrides can remove
-Alexa capabilities, especially for cameras, garage doors, and alarm panels.
+If there is no override, the panel shows the category inferred by Home Assistant.
+Incorrect category overrides can remove Alexa capabilities, especially for
+cameras, garage doors, and alarm panels.
 
 ## Expose New Entities
 
@@ -278,8 +284,8 @@ On save, the integration:
 3. Generates deterministic, sorted YAML.
 4. Creates a timestamped backup of both managed files.
 5. Retains the five most recent backup versions.
-6. Writes temporary files, flushes them, and atomically replaces both managed
-   files outside Home Assistant's event loop.
+6. Writes and flushes a temporary file for each managed file, then atomically
+   replaces each destination outside Home Assistant's event loop.
 7. Runs Home Assistant's full configuration checker.
 8. Restores both previous files automatically if validation fails.
 9. Records a restart-required revision only after a valid save.

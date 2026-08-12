@@ -45,6 +45,8 @@ export interface PanelConfig {
   url_path?: string;
 }
 
+export type ExposureStrategy = "allowlist" | "blocklist" | "rule_based" | "registry_default";
+
 export interface StatusResponse {
   configured?: boolean;
   setup_complete?: boolean;
@@ -53,9 +55,11 @@ export interface StatusResponse {
   restart_required?: boolean;
   last_saved?: string;
   version?: string;
+  strategy?: ExposureStrategy;
   expose_new_entities?: boolean;
   validation_errors?: ValidationIssue[];
   editing_enabled?: boolean;
+  editing_disabled_reason?: string | null;
   read_only?: boolean;
   read_only_reasons?: string[];
   last_validation?: LastValidation | null;
@@ -65,6 +69,12 @@ export interface StatusResponse {
     filter_created?: boolean;
     entity_config_created?: boolean;
     safe_defaults?: boolean;
+  };
+  configuration_state?: {
+    active_uses_managed_files?: boolean;
+    active_matches_saved?: boolean;
+    saved_valid?: boolean;
+    pending_restart?: boolean;
   };
 }
 
@@ -78,6 +88,7 @@ export interface LastValidation {
 export interface EntitiesResponse {
   revision?: string;
   entities_revision?: string;
+  strategy?: ExposureStrategy;
   expose_new_entities?: boolean;
   entities?: unknown[];
   exposure?: Record<string, boolean>;
@@ -85,6 +96,22 @@ export interface EntitiesResponse {
   missing_entity_ids?: string[];
   read_only?: boolean;
   read_only_reasons?: string[];
+}
+
+export interface MigrationPreviewResponse {
+  token?: string;
+  revision?: string;
+  entities_revision?: string;
+  strategy?: ExposureStrategy;
+  expose_new_entities?: boolean;
+  filter_yaml?: string;
+  entity_config_yaml?: string;
+  counts?: Record<string, number>;
+  source_inventory?: Record<string, number>;
+  legacy_source?: {
+    from_snapshot?: boolean;
+    captured_at?: string | null;
+  };
 }
 
 export interface ValidationIssue {

@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
+import yaml
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import Unauthorized
 
@@ -14,6 +16,11 @@ from custom_components.alexa_exposure_manager.compatibility import alexa_entity_
 from custom_components.alexa_exposure_manager.const import DOMAIN
 from custom_components.alexa_exposure_manager.diagnostics import (
     build_redacted_diagnostics,
+)
+from custom_components.alexa_exposure_manager.managed_files import (
+    InvalidManagedConfigurationError,
+    ManagedFileTransaction,
+    ValidationFailedError,
 )
 from custom_components.alexa_exposure_manager.websocket import (
     WS_COMMANDS,
@@ -36,6 +43,156 @@ EXPECTED_COMMANDS = {
     "alexa_exposure_manager/diagnostics",
     "alexa_exposure_manager/support_export",
 }
+
+
+@pytest.mark.asyncio
+async def test_migration_preview_and_confirm_copy_complete_rules_without_flattening(
+    tmp_path,
+) -> None:
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    fixture_path = (
+        Path(__file__).parents[1] / "fixtures" / "alexa" / "mixed_rules" / "alexa.yaml"
+    )
+    smart_home = yaml.safe_load(fixture_path.read_text())["smart_home"]
+    entity_config = smart_home.get("entity_config", {})
+
+    async def run_blocking(func, *args):
+        return await asyncio.to_thread(func, *args)
+
+    async def valid_config():
+        return None
+
+    class Store:
+        def __init__(self):
+            self.saves = 0
+
+        async def async_save(self, state):
+            self.saves += 1
+            self.state = state
+
+    transaction = ManagedFileTransaction(tmp_path, run_blocking, valid_config)
+    await transaction.async_initialize()
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.startup_alexa = {
+        "filter": smart_home["filter"],
+        "entity_config": entity_config,
+        "filter_active": False,
+        "entity_config_active": False,
+        "legacy_source_available": True,
+    }
+    runtime.transaction = transaction
+    runtime._store = Store()
+    runtime._migration_previews = {}
+    runtime._state = {
+        "restart_required": False,
+        "restart_revisions": None,
+        "migration_state": "not_started",
+        "last_validation": None,
+    }
+
+    async def async_entities():
+        return {
+            "revision": (await transaction.async_read())["revision"],
+            "entities_revision": (await transaction.async_read())["entities_revision"],
+            "entities": [
+                {
+                    "entity_id": "script.start_movie_time",
+                    "supported": True,
+                    "missing": False,
+                    "default_exposed": True,
+                },
+                {
+                    "entity_id": "light.kitchen",
+                    "supported": True,
+                    "missing": False,
+                    "default_exposed": True,
+                },
+                {
+                    "entity_id": "weather.local",
+                    "supported": True,
+                    "missing": False,
+                    "default_exposed": True,
+                },
+            ],
+        }
+
+    runtime.async_entities = async_entities
+    preview = await runtime.async_migration_preview()
+
+    assert yaml.safe_load(preview["filter_yaml"]) == smart_home["filter"]
+    assert (yaml.safe_load(preview["entity_config_yaml"]) or {}) == entity_config
+    assert preview["strategy"] == "rule_based"
+    assert runtime._store.saves == 0
+    assert yaml.safe_load((tmp_path / "alexa_exposure_filter.yaml").read_text()) == {
+        "include_entity_globs": ["__alexa_exposure_manager_never_match__.*"]
+    }
+
+    result = await runtime.async_migration_confirm(
+        {
+            "token": preview["token"],
+            "expected_revision": preview["revision"],
+            "expected_entities_revision": preview["entities_revision"],
+        }
+    )
+
+    assert result["migration_state"] == "complete"
+    assert result["strategy"] == "rule_based"
+    assert (
+        yaml.safe_load((tmp_path / "alexa_exposure_filter.yaml").read_text())
+        == (smart_home["filter"])
+    )
+    assert (
+        yaml.safe_load((tmp_path / "alexa_entity_config.yaml").read_text()) or {}
+    ) == entity_config
+
+
+@pytest.mark.asyncio
+async def test_failed_migration_confirmation_consumes_preview_token() -> None:
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    class Transaction:
+        last_validation = {
+            "ok": False,
+            "error": "invalid Alexa configuration",
+            "rollback": "complete",
+        }
+
+        async def async_import_save(self, **_kwargs):
+            raise ValidationFailedError("invalid Alexa configuration")
+
+    class Store:
+        async def async_save(self, state):
+            self.state = state
+
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.transaction = Transaction()
+    runtime._store = Store()
+    runtime._state = {"last_validation": None}
+    runtime._migration_previews = {
+        "one-use-token": {
+            "expected_revision": "filter-r1",
+            "expected_entities_revision": "entities-r1",
+            "filter_config": {"include_entities": ["light.one"]},
+            "entity_config": {},
+            "legacy_source_fingerprint": "source-r1",
+        }
+    }
+    message = {
+        "token": "one-use-token",
+        "expected_revision": "filter-r1",
+        "expected_entities_revision": "entities-r1",
+    }
+
+    with pytest.raises(ValidationFailedError, match="invalid Alexa configuration"):
+        await runtime.async_migration_confirm(message)
+
+    with pytest.raises(InvalidManagedConfigurationError, match="preview expired"):
+        await runtime.async_migration_confirm(message)
 
 
 def test_alexa_support_uses_home_assistant_adapter_without_false_negative(
@@ -367,6 +524,7 @@ async def test_status_command_returns_nested_instructions_without_secrets() -> N
                 "entities_revision": "entities-r1",
                 "expose_new_entities": False,
                 "exposure": {},
+                "filter": {"include_entities": ["light.secret_name"]},
                 "entity_config": {},
                 "read_only": False,
                 "read_only_reasons": [],
@@ -408,10 +566,39 @@ async def test_status_command_returns_nested_instructions_without_secrets() -> N
             "  entity_config: !include alexa_entity_config.yaml"
         ),
     }
-    assert status["managed_files"]["safe_defaults"] is True
+    assert status["managed_files"]["safe_defaults"] is False
+    assert status["configuration_state"] == {
+        "active_uses_managed_files": True,
+        "active_matches_saved": True,
+        "saved_valid": True,
+        "pending_restart": False,
+    }
     assert status["migration_available"] is True
     assert "must-not-leak" not in repr(status)
     assert "light.secret_name" not in repr(status)
+
+
+@pytest.mark.asyncio
+async def test_unexpected_migration_preview_error_is_structured_and_local() -> None:
+    class Runtime:
+        async def async_migration_preview(self):
+            raise RuntimeError("private traceback detail")
+
+    connection = await call_command(
+        websocket_migration_preview,
+        Runtime(),
+        {"id": 30, "type": "alexa_exposure_manager/migration/preview"},
+    )
+
+    assert connection.results == []
+    assert connection.errors == [
+        (
+            30,
+            "unexpected_error",
+            "Migration preview failed before any managed files were changed. "
+            "Check Home Assistant logs for details.",
+        )
+    ]
 
 
 @pytest.mark.asyncio
@@ -706,10 +893,13 @@ async def test_migration_preview_uses_home_assistant_filter_precedence(
     legacy_filter, expected_counts
 ) -> None:
     class Transaction:
-        async def async_preview(self, **_kwargs):
+        async def async_import_preview(self, **kwargs):
+            self.imported_filter = kwargs["filter_config"]
             return {
                 "revision": "filter-r1",
                 "entities_revision": "entities-r1",
+                "strategy": "rule_based",
+                "expose_new_entities": False,
                 "filter_yaml": "preview-filter",
                 "entity_config_yaml": "preview-entities",
             }
@@ -833,10 +1023,12 @@ async def test_restart_command_passes_requesting_admin_context() -> None:
 @pytest.mark.asyncio
 async def test_empty_filter_migration_uses_default_exposed_semantics() -> None:
     class Transaction:
-        async def async_preview(self, **_kwargs):
+        async def async_import_preview(self, **_kwargs):
             return {
                 "revision": "filter-r1",
                 "entities_revision": "entities-r1",
+                "strategy": "allowlist",
+                "expose_new_entities": False,
                 "filter_yaml": "preview-filter",
                 "entity_config_yaml": "preview-entities",
             }
@@ -895,15 +1087,85 @@ async def test_empty_filter_migration_uses_default_exposed_semantics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_migration_does_not_propose_alexa_unsupported_entities() -> None:
-    """Alexa can never discover an unsupported entity, and a normal save rejects it."""
+async def test_registry_default_managed_catalog_matches_home_assistant_defaults(
+    monkeypatch,
+) -> None:
+    from custom_components.alexa_exposure_manager import compatibility
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
 
     class Transaction:
-        async def async_preview(self, **kwargs):
-            self.proposed = kwargs["entities"]
+        async def async_read(self, _known_entity_ids=()):
             return {
                 "revision": "filter-r1",
                 "entities_revision": "entities-r1",
+                "strategy": "registry_default",
+                "expose_new_entities": False,
+                "filter": {},
+                "filter_empty": True,
+                "exposure": {},
+                "entity_config": {},
+                "missing_entity_ids": [],
+                "read_only": False,
+                "read_only_reasons": [],
+            }
+
+    monkeypatch.setattr(
+        compatibility,
+        "entity_catalog",
+        lambda _hass, _metadata: [
+            {
+                "entity_id": "light.public",
+                "name": "Public",
+                "display_categories": ["LIGHT"],
+                "default_exposed": True,
+                "missing": False,
+            },
+            {
+                "entity_id": "sensor.diagnostics",
+                "name": "Diagnostics",
+                "display_categories": [],
+                "default_exposed": False,
+                "missing": False,
+            },
+        ],
+    )
+    runtime = AlexaExposureManagerRuntime.__new__(AlexaExposureManagerRuntime)
+    runtime.hass = object()
+    runtime.transaction = Transaction()
+
+    result = await runtime.async_entities()
+    exposure = {entity["entity_id"]: entity["exposed"] for entity in result["entities"]}
+
+    assert exposure == {"light.public": True, "sensor.diagnostics": False}
+
+
+def test_entity_config_semantic_comparison_normalizes_display_category_scalar() -> None:
+    from custom_components.alexa_exposure_manager.runtime import (
+        AlexaExposureManagerRuntime,
+    )
+
+    scalar = {"light.one": {"display_categories": "LIGHT"}}
+    sequence = {"light.one": {"display_categories": ["LIGHT"]}}
+
+    assert AlexaExposureManagerRuntime._normalize_entity_config(scalar) == (
+        AlexaExposureManagerRuntime._normalize_entity_config(sequence)
+    )
+
+
+@pytest.mark.asyncio
+async def test_migration_preserves_rules_without_materializing_unsupported() -> None:
+    """Unsupported catalog entries must not alter the captured source rules."""
+
+    class Transaction:
+        async def async_import_preview(self, **kwargs):
+            self.imported_filter = kwargs["filter_config"]
+            return {
+                "revision": "filter-r1",
+                "entities_revision": "entities-r1",
+                "strategy": "rule_based",
+                "expose_new_entities": True,
                 "filter_yaml": "preview-filter",
                 "entity_config_yaml": "preview-entities",
             }
@@ -956,9 +1218,7 @@ async def test_migration_does_not_propose_alexa_unsupported_entities() -> None:
 
     counts = connection.results[0][1]["counts"]
     assert counts["unsupported"] == 1
-    proposed = {entity["entity_id"] for entity in transaction.proposed}
-    assert "select.thermostat_mode" not in proposed
-    assert "light.public" in proposed
+    assert transaction.imported_filter == {"exclude_domains": ["sensor"]}
 
 
 def _migration_runtime(startup_alexa, catalog, state=None):
@@ -968,12 +1228,14 @@ def _migration_runtime(startup_alexa, catalog, state=None):
     )
 
     class Transaction:
-        async def async_preview(self, **kwargs):
-            self.proposed = kwargs["entities"]
-            self.expose_new_entities = kwargs["expose_new_entities"]
+        async def async_import_preview(self, **kwargs):
+            self.imported_filter = kwargs["filter_config"]
+            self.imported_entity_config = kwargs["entity_config"]
             return {
                 "revision": "filter-r1",
                 "entities_revision": "entities-r1",
+                "strategy": "rule_based",
+                "expose_new_entities": False,
                 "filter_yaml": "preview-filter",
                 "entity_config_yaml": "preview-entities",
             }
@@ -1031,8 +1293,9 @@ async def test_missing_entity_defaults_to_exposed_under_an_empty_legacy_filter()
     )
 
     assert connection.results[0][1]["counts"]["missing"] == 1
-    proposed = {e["entity_id"]: e["exposed"] for e in runtime.transaction.proposed}
-    assert proposed["light.removed_last_year"] is True
+    assert runtime.transaction.imported_entity_config == {
+        "light.removed_last_year": {"name": "Old"}
+    }
 
 
 @pytest.mark.asyncio
@@ -1087,8 +1350,10 @@ async def test_migration_reads_the_pre_activation_snapshot_not_the_managed_file(
     }
     assert result["legacy_source"]["from_snapshot"] is True
     assert result["legacy_source"]["captured_at"] == "2026-08-09T10:00:00+00:00"
-    proposed = {e["entity_id"]: e["exposed"] for e in runtime.transaction.proposed}
-    assert proposed == {"light.kept": True, "light.dropped": False}
+    assert runtime.transaction.imported_filter == {"include_entities": ["light.kept"]}
+    assert runtime.transaction.imported_entity_config == {
+        "light.kept": {"name": "Kept"}
+    }
 
 
 @pytest.mark.asyncio

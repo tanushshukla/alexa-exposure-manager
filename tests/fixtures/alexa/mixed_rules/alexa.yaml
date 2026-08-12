@@ -1,0 +1,31 @@
+smart_home:
+  endpoint: https://api.amazonalexa.com/v3/events
+  filter:
+    include_entities:
+      - script.start_movie_time
+      - automation.voice_daily_summary
+    include_domains:
+      - light
+    include_entity_globs:
+      - switch.voice_*
+    exclude_entities:
+      - light.private_storage
+      - switch.removed_device
+      - switch.removed_device
+    exclude_domains:
+      - automation
+      - sensor
+      - weather
+    exclude_entity_globs:
+      - sensor.*_rssi
+      - switch.*_child_lock
+      - switch.*_child_lock
+  entity_config:
+    script.start_movie_time:
+      name: Movie time
+      description: Starts the shared movie scene
+      display_categories: ACTIVITY_TRIGGER
+    sensor.utility_rate:
+      description: Current utility rate
+    switch.removed_device:
+      name: Retired voice switch

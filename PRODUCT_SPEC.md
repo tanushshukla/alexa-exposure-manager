@@ -37,15 +37,17 @@ manages Alexa exposure in YAML.
 - The integration owns only `alexa_exposure_filter.yaml` and
   `alexa_entity_config.yaml`.
 - Managed YAML remains the source of truth.
-- Each entity has one exposed or hidden state.
-- **Expose new entities** off uses `include_entities`; on uses
-  `exclude_entities`.
-- Mode is derived purely from the managed filter key (`include_entities` vs
-  `exclude_entities`). No marker comment is required or written.
+- Each entity has one effective exposed or hidden state.
+- Simple **Expose new entities** off/on configurations use `include_entities`
+  or `exclude_entities`. Native mixed filters retain all six Home Assistant
+  entity-filter sections and use a separate rule-based strategy.
+- Empty native filters retain Home Assistant registry-default exposure and are
+  not converted implicitly.
 - Switching modes preserves current effective exposure.
-- Legacy entity, domain, and glob rules can be evaluated with Home Assistant's
-  `EntityFilter` semantics and flattened through a confirmed migration.
-- Advanced domain and glob rule editing is out of scope after migration.
+- Confirmed migration copies legacy entity, domain, glob, and metadata rules
+  without flattening, then validates and verifies the saved semantic model.
+- Advanced domain and glob rule editing is out of scope after migration, but
+  entity changes are stored as explicit exceptions without changing those rules.
 - Entity support comes from Home Assistant's built-in Alexa adapters, not a
   separate hardcoded compatibility table.
 - Normal edits are staged and saved together with revisions for both files.

@@ -510,7 +510,7 @@ var pe = X.litElementPolyfillSupport;
 pe?.({ LitElement: Z }), (X.litElementVersions ??= []).push("4.2.2");
 //#endregion
 //#region src/translations.ts
-var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PURIFIER.AUTO_ACCESSORY.CAMERA.CHRISTMAS_TREE.COFFEE_MAKER.CONTACT_SENSOR.DOOR.DOORBELL.EXTERIOR_BLIND.FAN.GAME_CONSOLE.GARAGE_DOOR.HEADPHONES.HUB.INTERIOR_BLIND.LAPTOP.LIGHT.MICROWAVE.MOBILE_PHONE.MOTION_SENSOR.MUSIC_SYSTEM.NETWORK_HARDWARE.OTHER.OVEN.PHONE.PRINTER.ROUTER.SCENE_TRIGGER.SCREEN.SECURITY_PANEL.SMARTLOCK.SMARTPLUG.SPEAKER.STREAMING_DEVICE.SWITCH.TABLET.TEMPERATURE_SENSOR.THERMOSTAT.TV.VACUUM_CLEANER.WATER_HEATER.WEARABLE".split("."), he = {
+var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PURIFIER.AUTO_ACCESSORY.CAMERA.CHRISTMAS_TREE.COFFEE_MAKER.COMPUTER.CONTACT_SENSOR.DOOR.DOORBELL.EXTERIOR_BLIND.FAN.GAME_CONSOLE.GARAGE_DOOR.HEADPHONES.HUB.INTERIOR_BLIND.LAPTOP.LIGHT.MICROWAVE.MOBILE_PHONE.MOTION_SENSOR.MUSIC_SYSTEM.NETWORK_HARDWARE.OTHER.OVEN.PHONE.PRINTER.REMOTE.ROUTER.SCENE_TRIGGER.SCREEN.SECURITY_PANEL.SECURITY_SYSTEM.SLOW_COOKER.SMARTLOCK.SMARTPLUG.SPEAKER.STREAMING_DEVICE.SWITCH.TABLET.TEMPERATURE_SENSOR.THERMOSTAT.TV.VACUUM_CLEANER.WATER_HEATER.WEARABLE".split("."), he = {
 	appTitle: "Alexa Exposure Manager",
 	loading: "Loading Alexa exposure configuration...",
 	loadErrorTitle: "Alexa exposure data could not be loaded",
@@ -572,6 +572,12 @@ var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	addEntities: "Add entities",
 	exposeNewLabel: "Expose new entities automatically",
 	exposeNewHelp: "Future supported entities will be exposed without changing current staged choices.",
+	ruleBasedStrategy: "Rule-based",
+	ruleBasedLabel: "Native Alexa filter rules",
+	ruleBasedHelp: "Domain and glob rules stay intact. Entity changes are saved only as explicit exceptions.",
+	registryDefaultStrategy: "Registry defaults",
+	registryDefaultLabel: "Home Assistant default exposure",
+	registryDefaultHelp: "Exposure follows each entity's Home Assistant registry settings until an explicit filter strategy is chosen.",
 	addDialogTitle: "Add entities to Alexa",
 	addDialogBody: "Search entities that are not currently exposed. Unsupported entities stay visible but cannot be selected.",
 	addSearchLabel: "Search entities to add",
@@ -635,6 +641,12 @@ var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	confirmRestore: "Confirm restore",
 	systemStatus: "System status",
 	configuredStatus: "Include files configured",
+	activeConfigStatus: "Active configuration: {value}",
+	savedConfigStatus: "Saved managed files: {value}",
+	managedFilesActive: "managed includes loaded in memory",
+	legacyConfigActive: "legacy or incomplete configuration loaded in memory",
+	activeMatchesSaved: "matches the active configuration",
+	activeDiffersSaved: "differs from the active configuration; restart may be required",
 	revisionStatus: "Configuration revision: {revision}",
 	restartStatus: "Restart required: {value}",
 	validationStatusOk: "Last validation: passed at {at}",
@@ -669,16 +681,20 @@ var me = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 	migrationMissingSetupBody: "Alexa cannot reconstruct previous YAML rules from its device list. If you had old domain, glob, entity, or metadata rules, restore the old inline filter from a backup and restart Home Assistant. Otherwise, activate the managed includes shown above, restart Home Assistant, then configure exposure in the manager.",
 	migrationMissingBody: "Alexa cannot reconstruct previous YAML rules from its device list. If you had old domain, glob, entity, or metadata rules, restore the old inline filter from a backup and restart Home Assistant. Otherwise, activate the managed includes if needed, restart Home Assistant, then configure exposure in the manager.",
 	migrationUnavailable: "No existing Alexa configuration is available to import.",
-	migrationSummary: "{exposed} exposed, {hidden} hidden, {unsupported} unsupported, and {missing} missing entities will be imported.",
+	migrationSummary: "Current evaluation: {exposed} exposed, {hidden} hidden, {unsupported} unsupported, and {missing} missing. The source rules will be copied without flattening.",
+	migrationInventory: "Rules found: {includeEntities} entity includes, {includeDomains} domain includes, {includeGlobs} include globs, {excludeEntities} entity excludes, {excludeDomains} domain excludes, {excludeGlobs} exclude globs, and {metadata} metadata entries.",
 	migrationSourceSnapshot: "Read from the Alexa configuration captured on {captured}, before the managed include files were activated.",
 	migrationSourceLive: "Read from your current Alexa configuration.",
 	migrationImport: "Import existing Alexa configuration",
 	migrationConfirmTitle: "Import existing Alexa configuration?",
 	migrationConfirmBody: "The manager will populate its dedicated include files from the preview. Alexa credentials and unrelated YAML are not changed.",
+	migrationPreviewAgain: "Create a new preview before retrying the import.",
 	confirmMigration: "Confirm migration",
 	validationIssue: "{entity}: {message}",
 	readOnlyTitle: "Editing is disabled",
-	readOnlyBody: "The managed YAML contains values this panel cannot safely preserve. Resolve these issues in YAML, restart Home Assistant, and reload the panel."
+	readOnlyBody: "The managed YAML contains values this panel cannot safely preserve. Resolve these issues in YAML, restart Home Assistant, and reload the panel.",
+	registryDefaultTitle: "Choose an explicit filter strategy before editing",
+	registryDefaultBody: "This empty Alexa filter follows Home Assistant registry defaults. Converting it implicitly would change current or future exposure, so entity editing remains disabled."
 };
 function Q(e, t = {}) {
 	return Object.entries(t).reduce((e, [t, n]) => e.replaceAll(`{${t}}`, String(n)), he[e]);
@@ -813,8 +829,11 @@ var $ = class e extends Z {
 		return B`
       <button type="button" aria-label=${Q("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${Q("migrationPreview")}</button>
       ${this.migrationPreviewResponse ? B`<div class="migration-result" role="status">
-            <span>${this.migrationSummary()}</span>
-            <span class="migration-source">${this.migrationSource()}</span>
+            <div>
+              <span>${this.migrationSummary()}</span>
+              <span class="migration-inventory">${this.migrationInventory()}</span>
+              <span class="migration-source">${this.migrationSource()}</span>
+            </div>
             ${typeof this.migrationPreviewResponse.token == "string" ? B`<button class="secondary" type="button" aria-label=${Q("migrationImport")} @click=${() => {
 			this.confirmation = "migration";
 		}}>${Q("migrationImport")}</button>` : H}
@@ -867,7 +886,7 @@ var $ = class e extends Z {
 
         ${this.renderConfiguredMigration()}
         ${this.status?.restart_required ? this.renderRestartBanner() : H}
-        ${this.editingEnabled ? H : B`<section class="message error" role="alert"><strong>${Q("readOnlyTitle")}</strong><span>${Q("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}</span></section>`}
+        ${this.editingEnabled ? H : B`<section class="message error" role="alert"><strong>${Q(this.strategy === "registry_default" ? "registryDefaultTitle" : "readOnlyTitle")}</strong><span>${this.strategy === "registry_default" ? Q("registryDefaultBody") : `${Q("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}`}</span></section>`}
         ${this.saveError ? B`<section class="message error" role="alert"><strong>${Q("saveErrorTitle")}</strong><span>${this.saveError}</span></section>` : H}
         ${this.validationIssues.length ? B`<section class="message error validation" role="alert"><strong>${Q("validationTitle")}</strong><ul>${this.validationIssues.map((e) => B`<li>${Q("validationIssue", {
 			entity: e.entity_id ?? e.field ?? Q("entitiesTitle"),
@@ -901,20 +920,26 @@ var $ = class e extends Z {
               </select>
             </label>
             <div class="toolbar-actions">
-              <div class="mode-control">
-                <button
-                  class="toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked=${String(this.exposeNewEntities)}
-                  aria-label=${Q("exposeNewLabel")}
-                  ?disabled=${!this.editingEnabled}
-                  @click=${() => {
+              ${this.strategy === "registry_default" ? B`<div class="mode-control rule-mode">
+                    <span class="strategy-chip">${Q("registryDefaultStrategy")}</span>
+                    <span><strong>${Q("registryDefaultLabel")}</strong><small>${Q("registryDefaultHelp")}</small></span>
+                  </div>` : this.strategy === "rule_based" ? B`<div class="mode-control rule-mode">
+                    <span class="strategy-chip">${Q("ruleBasedStrategy")}</span>
+                    <span><strong>${Q("ruleBasedLabel")}</strong><small>${Q("ruleBasedHelp")}</small></span>
+                  </div>` : B`<div class="mode-control">
+                    <button
+                      class="toggle"
+                      type="button"
+                      role="switch"
+                      aria-checked=${String(this.exposeNewEntities)}
+                      aria-label=${Q("exposeNewLabel")}
+                      ?disabled=${!this.editingEnabled}
+                      @click=${() => {
 			this.exposeNewEntities = !this.exposeNewEntities, this.saveError = "";
 		}}
-                ><span></span></button>
-                <span><strong>${Q("exposeNewLabel")}</strong><small>${Q("exposeNewHelp")}</small></span>
-              </div>
+                    ><span></span></button>
+                    <span><strong>${Q("exposeNewLabel")}</strong><small>${Q("exposeNewHelp")}</small></span>
+                  </div>`}
               <button class="secondary" type="button" aria-label=${Q("addEntities")} ?disabled=${!this.editingEnabled} @click=${this.openAddDialog}>
                 <ha-icon icon="mdi:plus"></ha-icon>${Q("addEntities")}
               </button>
@@ -1099,7 +1124,10 @@ var $ = class e extends Z {
 		});
 	}
 	get pendingCount() {
-		return Object.keys(this.staged).length + (this.exposeNewEntities === this.baseExposeNewEntities ? 0 : 1);
+		return Object.keys(this.staged).length + (this.strategy === "rule_based" || this.exposeNewEntities === this.baseExposeNewEntities ? 0 : 1);
+	}
+	get strategy() {
+		return this.entitiesResponse?.strategy ?? this.status?.strategy ?? (this.exposeNewEntities ? "blocklist" : "allowlist");
 	}
 	get editingEnabled() {
 		return this.status?.editing_enabled !== !1 && this.status?.read_only !== !0;
@@ -1360,17 +1388,10 @@ var $ = class e extends Z {
 		this.advancedOpen = !this.advancedOpen, !(!this.advancedOpen || this.previewResponse && this.backupsResponse) && await this.loadAdvanced();
 	}
 	async loadAdvanced() {
-		if (this.hass) {
-			this.advancedLoading = !0, this.advancedError = "";
-			try {
-				let [e, t] = await Promise.all([this.hass.connection.sendMessagePromise(this.previewMessage()), this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/backups" })]);
-				this.previewResponse = e ?? {}, this.backupsResponse = t ?? {};
-			} catch (e) {
-				this.advancedError = this.errorMessage(e);
-			} finally {
-				this.advancedLoading = !1;
-			}
-		}
+		if (!this.hass) return;
+		this.advancedLoading = !0, this.advancedError = "";
+		let [e, t] = await Promise.allSettled([this.hass.connection.sendMessagePromise(this.previewMessage()), this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/backups" })]);
+		e.status === "fulfilled" ? this.previewResponse = e.value ?? {} : this.advancedError = this.errorMessage(e.reason), t.status === "fulfilled" ? this.backupsResponse = t.value ?? {} : this.advancedError = [this.advancedError, this.errorMessage(t.reason)].filter(Boolean).join(" "), this.advancedLoading = !1;
 	}
 	renderAdvancedGrid() {
 		let e = String(this.previewResponse?.filter_yaml ?? this.previewResponse?.filter ?? ""), t = String(this.previewResponse?.entity_config_yaml ?? this.previewResponse?.entity_config ?? ""), n = (Array.isArray(this.backupsResponse?.backups) ? this.backupsResponse.backups : []).filter((e) => !!(e && typeof e == "object"));
@@ -1394,7 +1415,7 @@ var $ = class e extends Z {
         </section>
         <section class="advanced-card">
           <h3>${Q("systemStatus")}</h3>
-          <ul><li>${Q("configuredStatus")}</li><li>${Q("revisionStatus", { revision: this.status?.revision ?? "-" })}</li><li>${Q("restartStatus", { value: this.status?.restart_required ? Q("yes") : Q("no") })}</li><li>${this.renderValidationStatus()}</li><li>${Q("migrationStatus", { value: this.migrationStateLabel() })}</li></ul>
+          <ul><li>${Q("configuredStatus")}</li><li>${Q("activeConfigStatus", { value: this.status?.configuration_state?.active_uses_managed_files ? Q("managedFilesActive") : Q("legacyConfigActive") })}</li><li>${Q("savedConfigStatus", { value: this.status?.configuration_state?.active_matches_saved ? Q("activeMatchesSaved") : Q("activeDiffersSaved") })}</li><li>${Q("revisionStatus", { revision: this.status?.revision ?? "-" })}</li><li>${Q("restartStatus", { value: this.status?.restart_required ? Q("yes") : Q("no") })}</li><li>${this.renderValidationStatus()}</li><li>${Q("migrationStatus", { value: this.migrationStateLabel() })}</li></ul>
         </section>
         <section class="advanced-card">
           <h3>${Q("diagnosticsTitle")}</h3><p>${Q("diagnosticsBody")}</p>
@@ -1488,7 +1509,7 @@ var $ = class e extends Z {
 			}), this.migrationError = "", this.migrationPreviewResponse = void 0, this.staged = {}, await this.load();
 		} catch (t) {
 			let n = this.errorMessage(t);
-			e === "migration" && this.isConfigured() ? this.migrationError = n : this.isConfigured() ? this.advancedError = n : this.error = n;
+			e === "migration" ? (this.migrationError = `${n} ${Q("migrationPreviewAgain")}`, this.migrationPreviewResponse = void 0) : this.isConfigured() ? this.advancedError = n : this.error = n;
 		}
 	}
 	downloadSupportExport(e) {
@@ -1503,7 +1524,7 @@ var $ = class e extends Z {
 			try {
 				this.migrationPreviewResponse = await this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/migration/preview" });
 			} catch (e) {
-				this.isConfigured() ? this.migrationError = this.errorMessage(e) : this.error = this.errorMessage(e);
+				this.migrationError = this.errorMessage(e);
 			} finally {
 				this.migrationLoading = !1;
 			}
@@ -1525,6 +1546,18 @@ var $ = class e extends Z {
 		if (!e || typeof e != "object") return H;
 		let t = e;
 		return t.from_snapshot === !0 ? Q("migrationSourceSnapshot", { captured: String(t.captured_at ?? "") }) : Q("migrationSourceLive");
+	}
+	migrationInventory() {
+		let e = this.migrationPreviewResponse?.source_inventory ?? {};
+		return Q("migrationInventory", {
+			includeEntities: Number(e.include_entities ?? 0),
+			includeDomains: Number(e.include_domains ?? 0),
+			includeGlobs: Number(e.include_entity_globs ?? 0),
+			excludeEntities: Number(e.exclude_entities ?? 0),
+			excludeDomains: Number(e.exclude_domains ?? 0),
+			excludeGlobs: Number(e.exclude_entity_globs ?? 0),
+			metadata: Number(e.entity_config ?? 0)
+		});
 	}
 	get normalizedEntities() {
 		return (Array.isArray(this.entitiesResponse?.entities) ? this.entitiesResponse.entities : []).map((e) => this.normalizeEntity(e));
@@ -1601,6 +1634,7 @@ var $ = class e extends Z {
     .mode-control > span strong, .mode-control > span small { display: block; }
     .mode-control > span strong { font-size: 12px; }
     .mode-control > span small { max-width: 250px; margin-top: 3px; color: var(--secondary-text-color, #616161); font-size: 10px; }
+    .strategy-chip { flex: 0 0 auto; padding: 5px 8px; border: 1px solid var(--divider-color, #ddd); border-radius: 999px; background: var(--secondary-background-color, #f5f5f5); color: var(--primary-text-color, #212121); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
     button.secondary { display: inline-flex; align-items: center; gap: 7px; color: var(--primary-color, #03a9f4); background: transparent; border: 1px solid var(--primary-color, #03a9f4); }
     input { width: 100%; min-height: 44px; border: 1px solid var(--input-idle-line-color, var(--divider-color, #ccc)); border-radius: 8px; padding: 0 14px; color: var(--primary-text-color, #212121); background: var(--input-fill-color, transparent); font: inherit; }
     input:focus-visible { outline: 2px solid var(--primary-color, #03a9f4); outline-offset: 1px; }
@@ -1627,9 +1661,10 @@ var $ = class e extends Z {
     .exposure { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .exposure > span { font-size: 13px; font-weight: 600; }
     .exposure .exposed { color: var(--primary-color, #03a9f4); }
-    .toggle { position: relative; width: 44px; min-width: 44px; min-height: 24px; height: 24px; padding: 0; border-radius: 999px; background: var(--switch-unchecked-track-color, #9e9e9e); }
-    .toggle[aria-checked="true"] { background: var(--switch-checked-color, var(--primary-color, #03a9f4)); }
-    .toggle span { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--switch-unchecked-button-color, #fff); transition: transform .16s ease; }
+    .toggle { position: relative; width: 44px; min-width: 44px; min-height: 40px; height: 40px; padding: 0; border-radius: 999px; background: transparent; }
+    .toggle::before { content: ""; position: absolute; inset: 8px 0; border-radius: 999px; background: var(--switch-unchecked-track-color, #9e9e9e); }
+    .toggle[aria-checked="true"]::before { background: var(--switch-checked-color, var(--primary-color, #03a9f4)); }
+    .toggle span { position: absolute; top: 11px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--switch-unchecked-button-color, #fff); transition: transform .16s ease; }
     .toggle[aria-checked="true"] span { transform: translateX(20px); }
     .empty { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: var(--secondary-text-color, #616161); }
     .empty.compact { min-height: 180px; }
@@ -1692,6 +1727,8 @@ var $ = class e extends Z {
     .migration-notice.missing-source > div { margin-bottom: 0; }
     .migration-error { margin: 12px 0 0; color: var(--error-color, #db4437); font-weight: 600; }
     .migration-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px; border-radius: 8px; background: var(--secondary-background-color, #f5f5f5); }
+    .migration-result > div { display: grid; gap: 4px; }
+    .migration-inventory, .migration-source { display: block; color: var(--secondary-text-color, #616161); font-size: 12px; }
     .advanced { margin-top: 20px; overflow: hidden; border: 1px solid var(--divider-color, #e0e0e0); border-radius: var(--ha-card-border-radius, 12px); background: var(--card-background-color, #fff); }
     .advanced-toggle { width: 100%; min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 20px; color: var(--primary-text-color, #212121); background: transparent; text-align: left; }
     .advanced-toggle strong, .advanced-toggle small { display: block; }

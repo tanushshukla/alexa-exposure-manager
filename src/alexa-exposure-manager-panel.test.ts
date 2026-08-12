@@ -40,6 +40,7 @@ function configuredResponses(): Record<string, unknown> {
       revision: "config-r4",
       entities_revision: "entities-r9",
       restart_required: false,
+      strategy: "allowlist",
       expose_new_entities: false,
       migration_state: "complete",
       last_validation: {
@@ -52,6 +53,7 @@ function configuredResponses(): Record<string, unknown> {
     "alexa_exposure_manager/entities": {
       revision: "config-r4",
       entities_revision: "entities-r9",
+      strategy: "allowlist",
       entities: [
         {
           entity_id: "light.kitchen_ceiling",
@@ -220,6 +222,16 @@ describe("alexa-exposure-manager-panel", () => {
       revision: "config-r4",
       entities_revision: "entities-r9",
       counts: { exposed: 2, hidden: 2, unsupported: 0, missing: 0 },
+      strategy: "rule_based",
+      source_inventory: {
+        include_entities: 1,
+        include_domains: 0,
+        include_entity_globs: 0,
+        exclude_entities: 14,
+        exclude_domains: 10,
+        exclude_entity_globs: 6,
+        entity_config: 1,
+      },
       legacy_source: { from_snapshot: true, captured_at: "2026-08-09T10:00:00+00:00" },
     };
     responses["alexa_exposure_manager/migration/confirm"] = { migration_state: "complete" };
@@ -230,7 +242,10 @@ describe("alexa-exposure-manager-panel", () => {
     root.querySelector<HTMLButtonElement>("[aria-label='Preview existing Alexa configuration']")!.click();
     await settle(panel);
 
-    expect(root.textContent).toContain("2 exposed, 2 hidden, 0 unsupported, and 0 missing entities will be imported");
+    expect(root.textContent).toContain("Current evaluation: 2 exposed, 2 hidden, 0 unsupported, and 0 missing");
+    expect(root.textContent).toContain("14 entity excludes");
+    expect(root.textContent).toContain("10 domain excludes");
+    expect(root.textContent).toContain("6 exclude globs");
     const statusCallsBefore = panel.hass.connection.sendMessagePromise.mock.calls.filter(
       ([message]) => message.type === "alexa_exposure_manager/status",
     ).length;
@@ -295,6 +310,120 @@ describe("alexa-exposure-manager-panel", () => {
     expect(root.textContent).toContain("Migration preview failed");
     expect(root.textContent).toContain("Alexa exposure");
     expect(root.textContent).not.toContain("Alexa exposure data could not be loaded");
+  });
+
+  it("keeps setup migration errors local without replacing setup", async () => {
+    const panel = await createPanel({
+      "alexa_exposure_manager/status": {
+        configured: false,
+        managed_files: { safe_defaults: true },
+        migration_available: true,
+      },
+      "alexa_exposure_manager/entities": { entities: [] },
+      "alexa_exposure_manager/migration/preview": new Error("Preview failed before any files changed"),
+    });
+    const root = panel.shadowRoot!;
+
+    root.querySelector<HTMLButtonElement>("[aria-label='Preview existing Alexa configuration']")!.click();
+    await settle(panel);
+
+    expect(root.textContent).toContain("Preview failed before any files changed");
+    expect(root.textContent).toContain("The managed files now exist");
+    expect(root.textContent).not.toContain("Alexa exposure data could not be loaded");
+  });
+
+  it("labels native mixed filters and does not offer a destructive mode toggle", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/status"] = {
+      ...responses["alexa_exposure_manager/status"] as Record<string, unknown>,
+      strategy: "rule_based",
+      expose_new_entities: true,
+    };
+    responses["alexa_exposure_manager/entities"] = {
+      ...responses["alexa_exposure_manager/entities"] as Record<string, unknown>,
+      strategy: "rule_based",
+      expose_new_entities: true,
+    };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+
+    expect(root.textContent).toContain("Native Alexa filter rules");
+    expect(root.textContent).toContain("Domain and glob rules stay intact");
+    expect(root.querySelector("[aria-label='Expose new entities automatically']")).toBeNull();
+  });
+
+  it("shows registry-default exposure without allowing an implicit conversion", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/status"] = {
+      ...responses["alexa_exposure_manager/status"] as Record<string, unknown>,
+      strategy: "registry_default",
+      editing_enabled: false,
+    };
+    responses["alexa_exposure_manager/entities"] = {
+      ...responses["alexa_exposure_manager/entities"] as Record<string, unknown>,
+      strategy: "registry_default",
+    };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+
+    expect(root.textContent).toContain("Home Assistant default exposure");
+    expect(root.textContent).toContain("Choose an explicit filter strategy before editing");
+    expect(root.textContent).toContain("Converting it implicitly would change current or future exposure");
+    expect(root.querySelector<HTMLButtonElement>("[aria-label='Hide Kitchen ceiling']")!.disabled).toBe(true);
+  });
+
+  it("keeps registry-default backup recovery available when YAML preview is disabled", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/status"] = {
+      ...responses["alexa_exposure_manager/status"] as Record<string, unknown>,
+      strategy: "registry_default",
+      editing_enabled: false,
+    };
+    responses["alexa_exposure_manager/entities"] = {
+      ...responses["alexa_exposure_manager/entities"] as Record<string, unknown>,
+      strategy: "registry_default",
+    };
+    responses["alexa_exposure_manager/preview"] = new Error(
+      "Registry-default Alexa exposure cannot be edited losslessly",
+    );
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+
+    root.querySelector<HTMLButtonElement>("[aria-label='Advanced tools']")!.click();
+    await settle(panel);
+
+    expect(root.textContent).toContain("Registry-default Alexa exposure cannot be edited losslessly");
+    expect(root.textContent).toContain("backup-7");
+    expect(root.querySelector("[aria-label='Restore backup backup-7']")).not.toBeNull();
+  });
+
+  it("requires a fresh preview after migration confirmation fails", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/status"] = {
+      ...responses["alexa_exposure_manager/status"] as Record<string, unknown>,
+      migration_state: "not_started",
+      migration_available: true,
+    };
+    responses["alexa_exposure_manager/migration/preview"] = {
+      token: "migration-token",
+      revision: "config-r4",
+      entities_revision: "entities-r9",
+      counts: { exposed: 2, hidden: 2, unsupported: 0, missing: 0 },
+    };
+    responses["alexa_exposure_manager/migration/confirm"] = new Error("Validation failed");
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+
+    root.querySelector<HTMLButtonElement>("[aria-label='Preview existing Alexa configuration']")!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>("[aria-label='Import existing Alexa configuration']")!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>("[aria-label='Confirm migration']")!.click();
+    await settle(panel);
+
+    expect(root.textContent).toContain("Validation failed");
+    expect(root.textContent).toContain("Create a new preview before retrying the import");
+    expect(root.querySelector("[aria-label='Import existing Alexa configuration']")).toBeNull();
   });
 
   it("searches real entities, stages exposure, and saves with expected revisions", async () => {
@@ -707,7 +836,9 @@ describe("alexa-exposure-manager-panel", () => {
     expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith({
       type: "alexa_exposure_manager/migration/preview",
     });
-    expect(root.textContent).toContain("2 exposed, 0 hidden, 0 unsupported, and 0 missing entities will be imported");
+    expect(root.textContent).toContain(
+      "Current evaluation: 2 exposed, 0 hidden, 0 unsupported, and 0 missing",
+    );
 
     root.querySelector<HTMLButtonElement>("[aria-label='Import existing Alexa configuration']")!.click();
     await settle(panel);

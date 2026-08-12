@@ -4,6 +4,7 @@ import type {
   EntityDraft,
   EntitiesResponse,
   HomeAssistant,
+  MigrationPreviewResponse,
   PanelConfig,
   PanelRoute,
   StatusResponse,
@@ -84,7 +85,7 @@ export class AlexaExposureManagerPanel extends LitElement {
   declare private confirmation?: "restore" | "support" | "restart" | "migration";
   declare private confirmationTarget?: string;
   declare private operationMessage: string;
-  declare private migrationPreviewResponse?: Record<string, unknown>;
+  declare private migrationPreviewResponse?: MigrationPreviewResponse;
   declare private migrationLoading: boolean;
   declare private migrationError: string;
   declare private validationIssues: ValidationIssue[];
@@ -257,8 +258,11 @@ export class AlexaExposureManagerPanel extends LitElement {
       <button type="button" aria-label=${t("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${t("migrationPreview")}</button>
       ${this.migrationPreviewResponse
         ? html`<div class="migration-result" role="status">
-            <span>${this.migrationSummary()}</span>
-            <span class="migration-source">${this.migrationSource()}</span>
+            <div>
+              <span>${this.migrationSummary()}</span>
+              <span class="migration-inventory">${this.migrationInventory()}</span>
+              <span class="migration-source">${this.migrationSource()}</span>
+            </div>
             ${typeof this.migrationPreviewResponse.token === "string"
               ? html`<button class="secondary" type="button" aria-label=${t("migrationImport")} @click=${() => { this.confirmation = "migration"; }}>${t("migrationImport")}</button>`
               : nothing}
@@ -332,7 +336,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         ${this.renderConfiguredMigration()}
         ${this.status?.restart_required ? this.renderRestartBanner() : nothing}
         ${!this.editingEnabled
-          ? html`<section class="message error" role="alert"><strong>${t("readOnlyTitle")}</strong><span>${t("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}</span></section>`
+          ? html`<section class="message error" role="alert"><strong>${t(this.strategy === "registry_default" ? "registryDefaultTitle" : "readOnlyTitle")}</strong><span>${this.strategy === "registry_default" ? t("registryDefaultBody") : `${t("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}`}</span></section>`
           : nothing}
         ${this.saveError
           ? html`<section class="message error" role="alert"><strong>${t("saveErrorTitle")}</strong><span>${this.saveError}</span></section>`
@@ -368,21 +372,31 @@ export class AlexaExposureManagerPanel extends LitElement {
               </select>
             </label>
             <div class="toolbar-actions">
-              <div class="mode-control">
-                <button
-                  class="toggle"
-                  type="button"
-                  role="switch"
-                  aria-checked=${String(this.exposeNewEntities)}
-                  aria-label=${t("exposeNewLabel")}
-                  ?disabled=${!this.editingEnabled}
-                  @click=${() => {
-                    this.exposeNewEntities = !this.exposeNewEntities;
-                    this.saveError = "";
-                  }}
-                ><span></span></button>
-                <span><strong>${t("exposeNewLabel")}</strong><small>${t("exposeNewHelp")}</small></span>
-              </div>
+              ${this.strategy === "registry_default"
+                ? html`<div class="mode-control rule-mode">
+                    <span class="strategy-chip">${t("registryDefaultStrategy")}</span>
+                    <span><strong>${t("registryDefaultLabel")}</strong><small>${t("registryDefaultHelp")}</small></span>
+                  </div>`
+                : this.strategy === "rule_based"
+                ? html`<div class="mode-control rule-mode">
+                    <span class="strategy-chip">${t("ruleBasedStrategy")}</span>
+                    <span><strong>${t("ruleBasedLabel")}</strong><small>${t("ruleBasedHelp")}</small></span>
+                  </div>`
+                : html`<div class="mode-control">
+                    <button
+                      class="toggle"
+                      type="button"
+                      role="switch"
+                      aria-checked=${String(this.exposeNewEntities)}
+                      aria-label=${t("exposeNewLabel")}
+                      ?disabled=${!this.editingEnabled}
+                      @click=${() => {
+                        this.exposeNewEntities = !this.exposeNewEntities;
+                        this.saveError = "";
+                      }}
+                    ><span></span></button>
+                    <span><strong>${t("exposeNewLabel")}</strong><small>${t("exposeNewHelp")}</small></span>
+                  </div>`}
               <button class="secondary" type="button" aria-label=${t("addEntities")} ?disabled=${!this.editingEnabled} @click=${this.openAddDialog}>
                 <ha-icon icon="mdi:plus"></ha-icon>${t("addEntities")}
               </button>
@@ -594,7 +608,12 @@ export class AlexaExposureManagerPanel extends LitElement {
 
   private get pendingCount() {
     return Object.keys(this.staged).length +
-      (this.exposeNewEntities === this.baseExposeNewEntities ? 0 : 1);
+      (this.strategy === "rule_based" || this.exposeNewEntities === this.baseExposeNewEntities ? 0 : 1);
+  }
+
+  private get strategy() {
+    return this.entitiesResponse?.strategy ?? this.status?.strategy ??
+      (this.exposeNewEntities ? "blocklist" : "allowlist");
   }
 
   private get editingEnabled() {
@@ -943,18 +962,15 @@ export class AlexaExposureManagerPanel extends LitElement {
     if (!this.hass) return;
     this.advancedLoading = true;
     this.advancedError = "";
-    try {
-      const [preview, backups] = await Promise.all([
-        this.hass.connection.sendMessagePromise<Record<string, unknown>>(this.previewMessage()),
-        this.hass.connection.sendMessagePromise<Record<string, unknown>>({ type: "alexa_exposure_manager/backups" }),
-      ]);
-      this.previewResponse = preview ?? {};
-      this.backupsResponse = backups ?? {};
-    } catch (error) {
-      this.advancedError = this.errorMessage(error);
-    } finally {
-      this.advancedLoading = false;
-    }
+    const [preview, backups] = await Promise.allSettled([
+      this.hass.connection.sendMessagePromise<Record<string, unknown>>(this.previewMessage()),
+      this.hass.connection.sendMessagePromise<Record<string, unknown>>({ type: "alexa_exposure_manager/backups" }),
+    ]);
+    if (preview.status === "fulfilled") this.previewResponse = preview.value ?? {};
+    else this.advancedError = this.errorMessage(preview.reason);
+    if (backups.status === "fulfilled") this.backupsResponse = backups.value ?? {};
+    else this.advancedError = [this.advancedError, this.errorMessage(backups.reason)].filter(Boolean).join(" ");
+    this.advancedLoading = false;
   }
 
   private renderAdvancedGrid() {
@@ -980,7 +996,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         </section>
         <section class="advanced-card">
           <h3>${t("systemStatus")}</h3>
-          <ul><li>${t("configuredStatus")}</li><li>${t("revisionStatus", { revision: this.status?.revision ?? "-" })}</li><li>${t("restartStatus", { value: this.status?.restart_required ? t("yes") : t("no") })}</li><li>${this.renderValidationStatus()}</li><li>${t("migrationStatus", { value: this.migrationStateLabel() })}</li></ul>
+          <ul><li>${t("configuredStatus")}</li><li>${t("activeConfigStatus", { value: this.status?.configuration_state?.active_uses_managed_files ? t("managedFilesActive") : t("legacyConfigActive") })}</li><li>${t("savedConfigStatus", { value: this.status?.configuration_state?.active_matches_saved ? t("activeMatchesSaved") : t("activeDiffersSaved") })}</li><li>${t("revisionStatus", { revision: this.status?.revision ?? "-" })}</li><li>${t("restartStatus", { value: this.status?.restart_required ? t("yes") : t("no") })}</li><li>${this.renderValidationStatus()}</li><li>${t("migrationStatus", { value: this.migrationStateLabel() })}</li></ul>
         </section>
         <section class="advanced-card">
           <h3>${t("diagnosticsTitle")}</h3><p>${t("diagnosticsBody")}</p>
@@ -1089,7 +1105,10 @@ export class AlexaExposureManagerPanel extends LitElement {
       }
     } catch (error) {
       const message = this.errorMessage(error);
-      if (action === "migration" && this.isConfigured()) this.migrationError = message;
+      if (action === "migration") {
+        this.migrationError = `${message} ${t("migrationPreviewAgain")}`;
+        this.migrationPreviewResponse = undefined;
+      }
       else if (this.isConfigured()) this.advancedError = message;
       else this.error = message;
     }
@@ -1113,10 +1132,9 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.migrationLoading = true;
     this.migrationError = "";
     try {
-      this.migrationPreviewResponse = await this.hass.connection.sendMessagePromise<Record<string, unknown>>({ type: "alexa_exposure_manager/migration/preview" });
+      this.migrationPreviewResponse = await this.hass.connection.sendMessagePromise<MigrationPreviewResponse>({ type: "alexa_exposure_manager/migration/preview" });
     } catch (error) {
-      if (this.isConfigured()) this.migrationError = this.errorMessage(error);
-      else this.error = this.errorMessage(error);
+      this.migrationError = this.errorMessage(error);
     } finally {
       this.migrationLoading = false;
     }
@@ -1141,6 +1159,19 @@ export class AlexaExposureManagerPanel extends LitElement {
     if (values.from_snapshot !== true) return t("migrationSourceLive");
     return t("migrationSourceSnapshot", {
       captured: String(values.captured_at ?? ""),
+    });
+  }
+
+  private migrationInventory() {
+    const inventory = this.migrationPreviewResponse?.source_inventory ?? {};
+    return t("migrationInventory", {
+      includeEntities: Number(inventory.include_entities ?? 0),
+      includeDomains: Number(inventory.include_domains ?? 0),
+      includeGlobs: Number(inventory.include_entity_globs ?? 0),
+      excludeEntities: Number(inventory.exclude_entities ?? 0),
+      excludeDomains: Number(inventory.exclude_domains ?? 0),
+      excludeGlobs: Number(inventory.exclude_entity_globs ?? 0),
+      metadata: Number(inventory.entity_config ?? 0),
     });
   }
 
@@ -1242,6 +1273,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     .mode-control > span strong, .mode-control > span small { display: block; }
     .mode-control > span strong { font-size: 12px; }
     .mode-control > span small { max-width: 250px; margin-top: 3px; color: var(--secondary-text-color, #616161); font-size: 10px; }
+    .strategy-chip { flex: 0 0 auto; padding: 5px 8px; border: 1px solid var(--divider-color, #ddd); border-radius: 999px; background: var(--secondary-background-color, #f5f5f5); color: var(--primary-text-color, #212121); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
     button.secondary { display: inline-flex; align-items: center; gap: 7px; color: var(--primary-color, #03a9f4); background: transparent; border: 1px solid var(--primary-color, #03a9f4); }
     input { width: 100%; min-height: 44px; border: 1px solid var(--input-idle-line-color, var(--divider-color, #ccc)); border-radius: 8px; padding: 0 14px; color: var(--primary-text-color, #212121); background: var(--input-fill-color, transparent); font: inherit; }
     input:focus-visible { outline: 2px solid var(--primary-color, #03a9f4); outline-offset: 1px; }
@@ -1268,9 +1300,10 @@ export class AlexaExposureManagerPanel extends LitElement {
     .exposure { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .exposure > span { font-size: 13px; font-weight: 600; }
     .exposure .exposed { color: var(--primary-color, #03a9f4); }
-    .toggle { position: relative; width: 44px; min-width: 44px; min-height: 24px; height: 24px; padding: 0; border-radius: 999px; background: var(--switch-unchecked-track-color, #9e9e9e); }
-    .toggle[aria-checked="true"] { background: var(--switch-checked-color, var(--primary-color, #03a9f4)); }
-    .toggle span { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--switch-unchecked-button-color, #fff); transition: transform .16s ease; }
+    .toggle { position: relative; width: 44px; min-width: 44px; min-height: 40px; height: 40px; padding: 0; border-radius: 999px; background: transparent; }
+    .toggle::before { content: ""; position: absolute; inset: 8px 0; border-radius: 999px; background: var(--switch-unchecked-track-color, #9e9e9e); }
+    .toggle[aria-checked="true"]::before { background: var(--switch-checked-color, var(--primary-color, #03a9f4)); }
+    .toggle span { position: absolute; top: 11px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--switch-unchecked-button-color, #fff); transition: transform .16s ease; }
     .toggle[aria-checked="true"] span { transform: translateX(20px); }
     .empty { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: var(--secondary-text-color, #616161); }
     .empty.compact { min-height: 180px; }
@@ -1333,6 +1366,8 @@ export class AlexaExposureManagerPanel extends LitElement {
     .migration-notice.missing-source > div { margin-bottom: 0; }
     .migration-error { margin: 12px 0 0; color: var(--error-color, #db4437); font-weight: 600; }
     .migration-result { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 12px; border-radius: 8px; background: var(--secondary-background-color, #f5f5f5); }
+    .migration-result > div { display: grid; gap: 4px; }
+    .migration-inventory, .migration-source { display: block; color: var(--secondary-text-color, #616161); font-size: 12px; }
     .advanced { margin-top: 20px; overflow: hidden; border: 1px solid var(--divider-color, #e0e0e0); border-radius: var(--ha-card-border-radius, 12px); background: var(--card-background-color, #fff); }
     .advanced-toggle { width: 100%; min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 20px; color: var(--primary-text-color, #212121); background: transparent; text-align: left; }
     .advanced-toggle strong, .advanced-toggle small { display: block; }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -14,8 +15,11 @@ from .managed_files import (
     ManagedFilesError,
     ManagedYamlReadOnlyError,
     RevisionConflictError,
+    SemanticVerificationFailedError,
     ValidationFailedError,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 ENTITY_UPDATE_SCHEMA = {
     vol.Required("entity_id"): str,
@@ -48,12 +52,33 @@ async def _respond(hass, connection, msg, operation) -> None:
         connection.send_error(msg["id"], "managed_yaml_read_only", str(error))
     except ValidationFailedError as error:
         connection.send_error(msg["id"], "validation_failed", str(error))
+    except SemanticVerificationFailedError as error:
+        connection.send_error(msg["id"], "semantic_verification_failed", str(error))
     except BackupNotFoundError as error:
         connection.send_error(msg["id"], "backup_not_found", str(error))
     except InvalidManagedConfigurationError as error:
         connection.send_error(msg["id"], "invalid_configuration", str(error))
     except ManagedFilesError as error:
         connection.send_error(msg["id"], "managed_files_error", str(error))
+    except Exception:
+        command = msg.get("type", "Alexa exposure operation")
+        _LOGGER.exception("Unexpected failure handling %s", command)
+        if command == f"{DOMAIN}/migration/preview":
+            message = (
+                "Migration preview failed before any managed files were changed. "
+                "Check Home Assistant logs for details."
+            )
+        elif command == f"{DOMAIN}/migration/confirm":
+            message = (
+                "Migration import failed unexpectedly. Check Home Assistant logs and "
+                "the managed-file status before retrying."
+            )
+        else:
+            message = (
+                "Alexa Exposure Manager encountered an unexpected error. Check Home "
+                "Assistant logs for details."
+            )
+        connection.send_error(msg["id"], "unexpected_error", message)
     else:
         connection.send_result(msg["id"], result)
 

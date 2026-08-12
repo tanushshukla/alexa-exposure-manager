@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "alexa_exposure_manager"
 NAME: Final = "Alexa Exposure Manager"
-VERSION: Final = "0.1.6"
+VERSION: Final = "0.1.7"
 
 FILTER_FILENAME: Final = "alexa_exposure_filter.yaml"
 ENTITY_CONFIG_FILENAME: Final = "alexa_entity_config.yaml"
@@ -39,6 +39,7 @@ DISPLAY_CATEGORIES = frozenset(
         "CAMERA",
         "CHRISTMAS_TREE",
         "COFFEE_MAKER",
+        "COMPUTER",
         "CONTACT_SENSOR",
         "DOOR",
         "DOORBELL",
@@ -60,10 +61,13 @@ DISPLAY_CATEGORIES = frozenset(
         "OVEN",
         "PHONE",
         "PRINTER",
+        "REMOTE",
         "ROUTER",
         "SCENE_TRIGGER",
         "SCREEN",
         "SECURITY_PANEL",
+        "SECURITY_SYSTEM",
+        "SLOW_COOKER",
         "SMARTLOCK",
         "SMARTPLUG",
         "SPEAKER",
