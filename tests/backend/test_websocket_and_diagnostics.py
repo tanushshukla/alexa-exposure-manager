@@ -54,7 +54,11 @@ async def test_migration_preview_and_confirm_copy_complete_rules_without_flatten
     )
 
     fixture_path = (
-        Path(__file__).parents[1] / "fixtures" / "alexa" / "mixed_rules" / "alexa.yaml"
+        Path(__file__).parents[1]
+        / "fixtures"
+        / "alexa"
+        / "mixed_rules"
+        / "sample_alexa_config.yaml"
     )
     smart_home = yaml.safe_load(fixture_path.read_text())["smart_home"]
     entity_config = smart_home.get("entity_config", {})
@@ -279,7 +283,7 @@ async def test_empty_recreated_files_reopen_migration_for_inline_alexa_config(
         "  endpoint: https://api.amazonalexa.com/v3/events\n"
         "  filter:\n"
         "    include_entities:\n"
-        "      - script.find_shield_remote\n"
+        "      - script.sample_voice_action\n"
     )
     hass = HomeAssistant(str(tmp_path))
     await async_setup(hass, {})
@@ -292,7 +296,7 @@ async def test_empty_recreated_files_reopen_migration_for_inline_alexa_config(
     def entity_catalog(_hass, _entity_config):
         return [
             {
-                "entity_id": "script.find_shield_remote",
+                "entity_id": "script.sample_voice_action",
                 "supported": True,
                 "missing": False,
                 "default_exposed": True,
@@ -333,15 +337,15 @@ async def test_empty_recreated_files_reopen_migration_for_inline_alexa_config(
 
     assert runtime.startup_alexa["legacy_source_available"] is True
     assert runtime._state["legacy_snapshot"]["filter"] == {
-        "include_entities": ["script.find_shield_remote"]
+        "include_entities": ["script.sample_voice_action"]
     }
     assert status["configured"] is False
     assert status["migration_available"] is True
     assert preview["counts"]["exposed"] == 1
-    assert "script.find_shield_remote" in preview["filter_yaml"]
+    assert "script.sample_voice_action" in preview["filter_yaml"]
     assert result["migration_state"] == "complete"
     assert (
-        "script.find_shield_remote"
+        "script.sample_voice_action"
         in (tmp_path / "alexa_exposure_filter.yaml").read_text()
     )
     assert runtime._state["migration_source_fingerprint"]

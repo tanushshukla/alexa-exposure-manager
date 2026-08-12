@@ -35,7 +35,11 @@ def transaction(tmp_path: Path, validator=valid_config) -> ManagedFileTransactio
 
 def mixed_fixture() -> tuple[dict[str, object], dict[str, object]]:
     fixture_path = (
-        Path(__file__).parents[1] / "fixtures" / "alexa" / "mixed_rules" / "alexa.yaml"
+        Path(__file__).parents[1]
+        / "fixtures"
+        / "alexa"
+        / "mixed_rules"
+        / "sample_alexa_config.yaml"
     )
     smart_home = yaml.safe_load(fixture_path.read_text())["smart_home"]
     return smart_home["filter"], smart_home.get("entity_config", {})
