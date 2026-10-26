@@ -137,6 +137,31 @@ afterEach(() => {
 });
 
 describe("alexa-exposure-manager-panel", () => {
+  it("selects duplicate cleanup findings and stages them without saving", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = {
+      filter: { include_domains: ["light", "light"] },
+      cleanup_findings: [{ id: "duplicate:include_domains:light", kind: "duplicate", section: "include_domains", value: "light", count: 1 }],
+    };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Check duplicate rules"]')!.click();
+    await settle(panel);
+    const checkbox = root.querySelector<HTMLInputElement>('[aria-label="Select cleanup duplicate:include_domains:light"]')!;
+    checkbox.click();
+    await settle(panel);
+    responses["alexa_exposure_manager/preview"] = { filter: { include_domains: ["light"] } };
+    root.querySelector<HTMLButtonElement>('[aria-label="Stage selected cleanup"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith(expect.objectContaining({
+      type: "alexa_exposure_manager/preview", cleanup_selected: ["duplicate:include_domains:light"],
+    }));
+    expect(panel.hass.connection.sendMessagePromise).not.toHaveBeenCalledWith(expect.objectContaining({ type: "alexa_exposure_manager/save" }));
+    expect(root.textContent).toContain("Cleanup staged");
+  });
+
   it("uses native rules without removing metadata and shows draft reasons", async () => {
     const responses = configuredResponses();
     Object.assign(responses["alexa_exposure_manager/entities"] as object, {

@@ -11,7 +11,7 @@ import type {
   ValidationIssue,
 } from "./types";
 import { displayCategories, t } from "./translations";
-import { filterSections, type NativeFilter, type DraftPreview } from "./filter-rules";
+import { filterSections, type NativeFilter, type DraftPreview, type CleanupFinding } from "./filter-rules";
 
 export class AlexaExposureManagerPanel extends LitElement {
   static properties = {
@@ -56,6 +56,10 @@ export class AlexaExposureManagerPanel extends LitElement {
     rulesDraft: { state: true },
     draftPreview: { state: true },
     previewLoading: { state: true },
+    cleanupFindings: { state: true },
+    cleanupSelection: { state: true },
+    cleanupBusy: { state: true },
+    cleanupNotice: { state: true },
   };
 
   declare hass?: HomeAssistant;
@@ -103,6 +107,12 @@ export class AlexaExposureManagerPanel extends LitElement {
   declare private previewLoading: boolean;
   private previewFingerprint = "";
   private previewSequence = 0;
+  declare private cleanupFindings?: CleanupFinding[];
+  declare private cleanupSelection: string[];
+  declare private cleanupBusy: boolean;
+  declare private cleanupNotice: string;
+  private cleanupFingerprint = "";
+  private cleanupChecks: string[] = [];
   private dialogTrigger?: HTMLElement;
   private loadedConnection?: HomeAssistant["connection"];
   private static readonly CANDIDATE_WINDOW = 40;
@@ -135,6 +145,9 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.candidateWindowStart = 0;
     this.section = "entities";
     this.previewLoading = false;
+    this.cleanupSelection = [];
+    this.cleanupBusy = false;
+    this.cleanupNotice = "";
   }
 
   protected updated(changed: PropertyValues) {
@@ -372,6 +385,7 @@ export class AlexaExposureManagerPanel extends LitElement {
           : nothing}
 
         ${this.section === "rules" ? this.renderRules() : nothing}
+        ${this.section === "settings" ? this.renderCleanup() : nothing}
         <section class="workspace" ?hidden=${this.section !== "entities"}>
           <div class="toolbar">
             <label>
@@ -464,6 +478,66 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.exposeNewEntities = this.baseExposeNewEntities;
     this.saveError = "";
     this.validationIssues = [];
+    this.cleanupFindings = undefined;
+    this.cleanupSelection = [];
+    this.cleanupNotice = "";
+  }
+
+  private async checkCleanup(checks: string[]) {
+    if (!this.hass) return;
+    this.cleanupBusy = true;
+    this.cleanupNotice = "";
+    this.cleanupFindings = undefined;
+    this.cleanupSelection = [];
+    const fingerprint = this.draftFingerprint();
+    try {
+      const result = await this.hass.connection.sendMessagePromise<DraftPreview>({
+        ...this.previewMessage(), cleanup_checks: checks,
+      });
+      if (fingerprint !== this.draftFingerprint()) return;
+      this.cleanupFindings = result.cleanup_findings ?? [];
+      this.cleanupChecks = checks;
+      this.cleanupFingerprint = fingerprint;
+    } catch (error) { this.saveError = this.errorMessage(error); }
+    finally { this.cleanupBusy = false; }
+  }
+
+  private async stageCleanup() {
+    if (!this.hass || this.cleanupFingerprint !== this.draftFingerprint()) return;
+    this.cleanupBusy = true;
+    try {
+      const result = await this.hass.connection.sendMessagePromise<DraftPreview>({
+        ...this.previewMessage(), cleanup_checks: this.cleanupChecks, cleanup_selected: this.cleanupSelection,
+      });
+      if (this.cleanupFingerprint !== this.draftFingerprint()) return;
+      this.rulesDraft = result.filter ?? {};
+      this.cleanupFindings = undefined;
+      this.cleanupSelection = [];
+      this.cleanupNotice = "Cleanup staged. Preview exposure changes, then Save to commit or Discard to cancel.";
+      await this.updateComplete;
+      await this.previewDraft();
+    } catch (error) { this.saveError = this.errorMessage(error); }
+    finally { this.cleanupBusy = false; }
+  }
+
+  private renderCleanup() {
+    const stale = this.cleanupFingerprint !== this.draftFingerprint();
+    return html`<section class="workspace rules-editor" aria-label="Cleanup">
+      <h2>Cleanup</h2>
+      <p>Preview safe changes to the managed files only. Devices in Home Assistant and Amazon are never deleted. Select findings to stage them in the shared draft.</p>
+      <button type="button" aria-label="Check duplicate rules" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["duplicates"])}>Check duplicate rules</button>
+      ${this.cleanupBusy ? html`<p role="status">Checking cleanup…</p>` : nothing}
+      ${this.cleanupNotice ? html`<p role="status">${this.cleanupNotice}</p>` : nothing}
+      ${this.cleanupFindings ? html`
+        ${stale ? html`<p role="status">Draft changed. Run cleanup checks again.</p>` : nothing}
+        ${this.cleanupFindings.length ? html`<ul>${this.cleanupFindings.map((finding) => html`<li><label>
+          <input type="checkbox" aria-label=${`Select cleanup ${finding.id}`} ?disabled=${stale || this.cleanupBusy} .checked=${this.cleanupSelection.includes(finding.id)} @change=${(event: Event) => {
+            this.cleanupSelection = (event.currentTarget as HTMLInputElement).checked ? [...this.cleanupSelection, finding.id] : this.cleanupSelection.filter((id) => id !== finding.id);
+          }} /> <code>${finding.value}</code> — ${finding.section}: ${finding.count} extra occurrence(s)
+        </label></li>`)}</ul>` : html`<p role="status">No cleanup findings.</p>`}
+        <button type="button" aria-label="Stage selected cleanup" ?disabled=${stale || this.cleanupBusy || !this.cleanupSelection.length} @click=${this.stageCleanup}>Stage selected cleanup</button>
+      ` : nothing}
+    </section>`;
   }
 
   private draftFingerprint() {

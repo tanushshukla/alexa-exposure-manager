@@ -22,6 +22,38 @@ async def valid():
     return None
 
 
+async def test_duplicate_cleanup_is_selective_and_does_not_write(runtime):
+    before = await runtime.transaction.async_read()
+    rules = {
+        "include_domains": ["light", "switch", "light", "light"],
+        "exclude_entity_globs": ["switch.*", "switch.*", "switch.room"],
+    }
+    message = {
+        "expose_new_entities": False,
+        "filter_config": rules,
+        "entities": [{"entity_id": "light.room", "name": "Room"}],
+        "cleanup_checks": ["duplicates"],
+    }
+    preview = await runtime.async_preview(message)
+    assert preview["filter"] == rules
+    findings = preview["cleanup_findings"]
+    assert len(findings) == 2
+    assert findings[0] == {
+        "id": "duplicate:include_domains:light",
+        "kind": "duplicate",
+        "section": "include_domains",
+        "value": "light",
+        "count": 2,
+    }
+    selected = await runtime.async_preview(
+        {**message, "cleanup_selected": [findings[0]["id"]]}
+    )
+    assert selected["filter"]["include_domains"] == ["light", "switch"]
+    assert selected["filter"]["exclude_entity_globs"] == rules["exclude_entity_globs"]
+    assert selected["entity_config"]["light.room"] == {"name": "Room"}
+    assert (await runtime.transaction.async_read())["revision"] == before["revision"]
+
+
 @pytest.mark.asyncio
 async def test_use_rules_removes_both_explicit_lists_but_preserves_metadata(
     runtime, hass

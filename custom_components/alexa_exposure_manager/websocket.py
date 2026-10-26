@@ -113,6 +113,8 @@ async def websocket_entities(hass, connection, msg) -> None:
         vol.Required("expose_new_entities"): bool,
         vol.Optional("entities", default=[]): [ENTITY_UPDATE_SCHEMA],
         vol.Optional("filter_config"): dict,
+        vol.Optional("cleanup_checks"): [vol.In(["duplicates"])],
+        vol.Optional("cleanup_selected"): [str],
     }
 )
 @websocket_api.require_admin

@@ -10,6 +10,7 @@ export const filterSections = [
 export type NativeFilter = Partial<Record<typeof filterSections[number][0], string[]>>;
 
 export interface DraftPreview {
+  cleanup_findings?: CleanupFinding[];
   filter?: NativeFilter;
   strategy?: string;
   exposure?: Record<string, boolean>;
@@ -18,4 +19,12 @@ export interface DraftPreview {
   future_behavior?: string;
   filter_yaml?: string;
   entity_config_yaml?: string;
+}
+
+export interface CleanupFinding {
+  id: string;
+  kind: "duplicate" | "missing";
+  section?: string;
+  value: string;
+  count: number;
 }

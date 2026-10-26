@@ -21,7 +21,7 @@ from .const import (
     VERSION,
 )
 from .diagnostics import build_redacted_diagnostics
-from .filter_rules import exposure_reason
+from .filter_rules import apply_duplicates, duplicate_findings, exposure_reason
 from .managed_files import (
     InvalidManagedConfigurationError,
     ManagedFileTransaction,
@@ -371,6 +371,27 @@ class AlexaExposureManagerRuntime:
             known_entity_ids=known_ids,
             filter_config=message.get("filter_config"),
         )
+        if "cleanup_checks" in message:
+            findings = (
+                duplicate_findings(preview["filter"])
+                if "duplicates" in message["cleanup_checks"]
+                else []
+            )
+            selected = message.get("cleanup_selected", [])
+            if set(selected) - {item["id"] for item in findings}:
+                raise InvalidManagedConfigurationError(
+                    "Cleanup selection is stale; run checks again"
+                )
+            if selected:
+                preview = await self.transaction.async_preview(
+                    expose_new_entities=message["expose_new_entities"],
+                    entities=message.get("entities", []),
+                    known_entity_ids=known_ids,
+                    filter_config=apply_duplicates(
+                        preview["filter"], findings, selected
+                    ),
+                )
+            preview["cleanup_findings"] = findings
         # Empty native filters defer to Alexa registry defaults, not include-all.
         for entity in catalog["entities"]:
             if preview["strategy"] == "registry_default":
