@@ -86,6 +86,7 @@ export interface LastValidation {
 }
 
 export interface EntitiesResponse {
+  filter?: import("./filter-rules").NativeFilter;
   revision?: string;
   entities_revision?: string;
   strategy?: ExposureStrategy;

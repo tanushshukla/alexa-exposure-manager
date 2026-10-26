@@ -348,29 +348,67 @@ class AlexaExposureManagerRuntime:
             "expose_new_entities": snapshot["expose_new_entities"],
             "read_only": snapshot["read_only"],
             "entities": entities,
+            "filter": snapshot["filter"],
+            "entity_config": snapshot["entity_config"],
         }
 
     async def async_preview(self, message: dict[str, Any]) -> dict[str, Any]:
         """Preview deterministic YAML for staged browser changes."""
         self._require_editing()
-        await self._require_lossless_editing_strategy()
+        if "filter_config" not in message:
+            await self._require_lossless_editing_strategy()
         catalog = await self.async_entities()
         known_ids = {
             entity["entity_id"]
             for entity in catalog["entities"]
             if not entity["missing"]
         }
-        return await self.transaction.async_preview(
+        preview = await self.transaction.async_preview(
             expose_new_entities=message["expose_new_entities"],
             entities=message.get("entities", []),
             known_entity_ids=known_ids,
+            filter_config=message.get("filter_config"),
         )
+        # Empty native filters defer to Alexa registry defaults, not include-all.
+        for entity in catalog["entities"]:
+            if preview["strategy"] == "registry_default":
+                preview["exposure"][entity["entity_id"]] = bool(
+                    entity.get("default_exposed", True)
+                )
+        preview["impact"] = {
+            "exposed": [
+                entity["entity_id"]
+                for entity in catalog["entities"]
+                if not entity["missing"]
+                and not entity["exposed"]
+                and preview["exposure"].get(entity["entity_id"], False)
+            ],
+            "hidden": [
+                entity["entity_id"]
+                for entity in catalog["entities"]
+                if not entity["missing"]
+                and entity["exposed"]
+                and not preview["exposure"].get(entity["entity_id"], False)
+            ],
+        }
+        preview["future_behavior"] = (
+            "No filter rules: future entities use Alexa registry-default exposure. "
+            "Removing the last include may broaden exposure."
+            if preview["strategy"] == "registry_default"
+            else "Future matching entities follow these native rules. "
+            "Removing includes may broaden exposure; only Alexa-supported entities "
+            "can be discovered."
+        )
+        return preview
 
     async def async_save(self, message: dict[str, Any]) -> dict[str, Any]:
         """Validate exposure support and save staged browser changes."""
         self._require_editing()
         catalog_response = await self.async_entities()
-        if catalog_response["strategy"] == "registry_default":
+        if (
+            catalog_response["strategy"] == "registry_default"
+            and "filter_config" not in message
+        ):
             raise InvalidManagedConfigurationError(
                 "Registry-default Alexa exposure cannot be edited losslessly; "
                 "choose an explicit filter strategy first"
@@ -399,6 +437,7 @@ class AlexaExposureManagerRuntime:
             expose_new_entities=message["expose_new_entities"],
             entities=message.get("entities", []),
             known_entity_ids=known_ids,
+            filter_config=message.get("filter_config"),
         )
         await self._record_restart_required(result)
         return result

@@ -111,6 +111,7 @@ async def websocket_entities(hass, connection, msg) -> None:
         "type": f"{DOMAIN}/preview",
         vol.Required("expose_new_entities"): bool,
         vol.Optional("entities", default=[]): [ENTITY_UPDATE_SCHEMA],
+        vol.Optional("filter_config"): dict,
     }
 )
 @websocket_api.require_admin
@@ -127,6 +128,7 @@ async def websocket_preview(hass, connection, msg) -> None:
         vol.Required("expected_entities_revision"): str,
         vol.Required("expose_new_entities"): bool,
         vol.Optional("entities", default=[]): [ENTITY_UPDATE_SCHEMA],
+        vol.Optional("filter_config"): dict,
     }
 )
 @websocket_api.require_admin

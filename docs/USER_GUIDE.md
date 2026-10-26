@@ -473,3 +473,20 @@ Alexa Exposure Manager does not:
   API.
 - Trigger Alexa discovery or call Amazon APIs.
 - Configure Home Assistant entity-registry aliases.
+# Native filter rules
+
+The **Filter rules** section edits all six Home Assistant include/exclude lists:
+entities, domains, and entity glob patterns. Existing managed rules load directly;
+there is no second rules store and glob patterns are not regular expressions.
+Use one value per line. Exact entity IDs are valid in glob lists too.
+
+Choose **Preview exposure changes** to review newly exposed and hidden entities
+before saving a rule draft. Home Assistant's native precedence applies: explicit
+entity exceptions can override domain/glob rules. Future entities follow those
+rules, so the current-entity preview cannot enumerate future matches. Removing
+the last include can broaden exposure; an empty native filter uses Alexa's
+registry defaults rather than resetting to an explicit deny-all list.
+
+Rule changes share pending Save/Discard with entity and metadata edits. Saves
+retain revision checks, paired backups, full configuration validation and rollback.
+Restart Home Assistant after saving, then run Alexa discovery yourself.

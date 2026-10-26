@@ -11,6 +11,7 @@ import type {
   ValidationIssue,
 } from "./types";
 import { displayCategories, t } from "./translations";
+import { filterSections, type NativeFilter, type DraftPreview } from "./filter-rules";
 
 export class AlexaExposureManagerPanel extends LitElement {
   static properties = {
@@ -51,6 +52,10 @@ export class AlexaExposureManagerPanel extends LitElement {
     validationIssues: { state: true },
     restartBannerDismissed: { state: true },
     candidateWindowStart: { state: true },
+    section: { state: true },
+    rulesDraft: { state: true },
+    draftPreview: { state: true },
+    previewLoading: { state: true },
   };
 
   declare hass?: HomeAssistant;
@@ -92,6 +97,12 @@ export class AlexaExposureManagerPanel extends LitElement {
   declare private restartBannerDismissed: boolean;
   declare private candidateWindowStart: number;
   private baseExposeNewEntities = false;
+  declare private section: "entities" | "rules" | "settings";
+  declare private rulesDraft?: NativeFilter;
+  declare private draftPreview?: DraftPreview;
+  declare private previewLoading: boolean;
+  private previewFingerprint = "";
+  private previewSequence = 0;
   private dialogTrigger?: HTMLElement;
   private loadedConnection?: HomeAssistant["connection"];
   private static readonly CANDIDATE_WINDOW = 40;
@@ -122,9 +133,17 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.validationIssues = [];
     this.restartBannerDismissed = false;
     this.candidateWindowStart = 0;
+    this.section = "entities";
+    this.previewLoading = false;
   }
 
   protected updated(changed: PropertyValues) {
+    if (changed.has("staged") || changed.has("rulesDraft") || changed.has("exposeNewEntities")) {
+      this.draftPreview = undefined;
+      this.previewFingerprint = "";
+      this.previewSequence++;
+      this.previewResponse = undefined;
+    }
     if (
       changed.has("hass") &&
       this.hass &&
@@ -333,6 +352,13 @@ export class AlexaExposureManagerPanel extends LitElement {
           </div>
         </header>
 
+        <nav class="section-nav" aria-label="Exposure manager sections">
+          <button class="secondary" type="button" aria-label="Entities" aria-current=${this.section === "entities" ? "page" : nothing} @click=${() => { this.section = "entities"; }}>Entities</button>
+          <button class="secondary" type="button" aria-label="Filter rules" aria-current=${this.section === "rules" ? "page" : nothing} @click=${() => { this.section = "rules"; }}>Filter rules</button>
+          <button class="secondary" type="button" aria-label="Settings" aria-current=${this.section === "settings" ? "page" : nothing} @click=${() => { this.section = "settings"; void this.loadAdvanced(); }}>Settings</button>
+          ${this.pendingCount ? html`<button class="text-button" type="button" aria-label="Discard changes" ?disabled=${this.saving} @click=${this.discard}>Discard changes</button>` : nothing}
+        </nav>
+
         ${this.renderConfiguredMigration()}
         ${this.status?.restart_required ? this.renderRestartBanner() : nothing}
         ${!this.editingEnabled
@@ -345,7 +371,8 @@ export class AlexaExposureManagerPanel extends LitElement {
           ? html`<section class="message error validation" role="alert"><strong>${t("validationTitle")}</strong><ul>${this.validationIssues.map((issue) => html`<li>${t("validationIssue", { entity: issue.entity_id ?? issue.field ?? t("entitiesTitle"), message: issue.message })}</li>`)}</ul></section>`
           : nothing}
 
-        <section class="workspace">
+        ${this.section === "rules" ? this.renderRules() : nothing}
+        <section class="workspace" ?hidden=${this.section !== "entities"}>
           <div class="toolbar">
             <label>
               <span class="sr-only">${t("entitySearchLabel")}</span>
@@ -426,9 +453,71 @@ export class AlexaExposureManagerPanel extends LitElement {
               `
             : html`<div class="empty"><strong>${t(this.entityCount === 0 ? "emptyTitle" : "filteredEmptyTitle")}</strong><span>${t(this.entityCount === 0 ? "emptyBody" : "filteredEmptyBody")}</span></div>`}
         </section>
-        ${this.renderAdvanced()}
+        ${this.section !== "rules" ? this.renderAdvanced() : nothing}
       </div>
     `;
+  }
+
+  private discard() {
+    this.staged = {};
+    this.rulesDraft = undefined;
+    this.exposeNewEntities = this.baseExposeNewEntities;
+    this.saveError = "";
+    this.validationIssues = [];
+  }
+
+  private draftFingerprint() {
+    return JSON.stringify(this.previewMessage());
+  }
+
+  private async previewDraft() {
+    if (!this.hass) return;
+    const fingerprint = this.draftFingerprint();
+    const sequence = ++this.previewSequence;
+    this.previewLoading = true;
+    this.saveError = "";
+    try {
+      const preview = await this.hass.connection.sendMessagePromise<DraftPreview>(this.previewMessage());
+      if (sequence !== this.previewSequence || fingerprint !== this.draftFingerprint()) return;
+      this.draftPreview = preview;
+      this.previewFingerprint = fingerprint;
+    } catch (error) {
+      if (sequence === this.previewSequence) this.saveError = this.errorMessage(error);
+    } finally {
+      this.previewLoading = false;
+    }
+  }
+
+  private renderRules() {
+    const rules = this.rulesDraft ?? this.entitiesResponse?.filter ?? {};
+    const canEdit = !this.saving && !this.status?.read_only && this.isConfigured();
+    const impact = this.draftPreview?.impact;
+    return html`<section class="workspace rules-editor" aria-label="Native filter rules">
+      <h2>Filter rules</h2>
+      <p>Home Assistant native filters. Enter one entity ID, domain, or glob pattern per line. Glob patterns are not regular expressions. Explicit entities, globs and domains use Home Assistant’s native precedence.</p>
+      <div class="rules-grid">${filterSections.map(([key, label]) => html`<label>
+        <span>${label}</span>
+        <textarea data-filter-key=${key} aria-label=${label} rows="5" spellcheck="false" ?disabled=${!canEdit}
+          .value=${(rules[key] ?? []).join("\n")}
+          @input=${(event: Event) => {
+            const next = { ...rules };
+            const values = (event.currentTarget as HTMLTextAreaElement).value.split("\n").map((value) => value.trim()).filter(Boolean);
+            if (values.length) next[key] = values;
+            else delete next[key];
+            this.rulesDraft = next;
+          }}></textarea>
+      </label>`)}</div>
+      <button type="button" aria-label="Preview exposure changes" ?disabled=${!canEdit || this.previewLoading} @click=${this.previewDraft}>${this.previewLoading ? "Loading preview…" : "Preview exposure changes"}</button>
+      ${this.rulesDraft && !this.draftPreview ? html`<p role="status">Preview required before saving rule changes.</p>` : nothing}
+      ${impact ? html`<section class="impact" role="status">
+        <strong>${impact.exposed.length} newly exposed · ${impact.hidden.length} newly hidden</strong>
+        <p>${this.draftPreview?.future_behavior}</p>
+        <details><summary>Review affected entities</summary>
+          <h3>Newly exposed</h3><ul>${impact.exposed.map((id) => html`<li><code>${id}</code></li>`)}</ul>
+          <h3>Newly hidden</h3><ul>${impact.hidden.map((id) => html`<li><code>${id}</code></li>`)}</ul>
+        </details>
+      </section>` : nothing}
+    </section>`;
   }
 
   private renderEntity(entity: AlexaEntity) {
@@ -511,6 +600,10 @@ export class AlexaExposureManagerPanel extends LitElement {
 
   private async save() {
     if (!this.hass || !this.pendingCount) return;
+    if (this.rulesDraft && this.previewFingerprint !== this.draftFingerprint()) {
+      this.saveError = "Preview required. Review exposure changes before saving filter rules.";
+      return;
+    }
     this.saving = true;
     this.saveError = "";
     try {
@@ -549,6 +642,12 @@ export class AlexaExposureManagerPanel extends LitElement {
       };
       this.baseExposeNewEntities = this.exposeNewEntities;
       this.staged = {};
+      if (this.rulesDraft) {
+        this.rulesDraft = undefined;
+        await this.load();
+      }
+      this.previewResponse = undefined;
+      this.backupsResponse = undefined;
     } catch (error) {
       const message = this.errorMessage(error);
       const code = this.errorCode(error);
@@ -581,6 +680,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       expected_entities_revision: this.entitiesResponse?.entities_revision ?? this.status?.entities_revision ?? "",
       expose_new_entities: this.exposeNewEntities,
       entities: this.entityUpdates(),
+      ...(this.rulesDraft ? { filter_config: this.rulesDraft } : {}),
     };
   }
 
@@ -589,6 +689,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       type: "alexa_exposure_manager/preview",
       expose_new_entities: this.exposeNewEntities,
       entities: this.entityUpdates(),
+      ...(this.rulesDraft ? { filter_config: this.rulesDraft } : {}),
     };
   }
 
@@ -598,7 +699,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         ? { entity_id: entityId, remove: true }
         : {
             entity_id: entityId,
-            exposed: draft.exposed,
+            ...(!this.rulesDraft || draft.exposed !== this.normalizedEntities.find((entity) => entity.entityId === entityId)?.exposed ? { exposed: draft.exposed } : {}),
             name: draft.name,
             description: draft.description,
             display_categories: draft.displayCategories.slice(0, 1),
@@ -608,15 +709,18 @@ export class AlexaExposureManagerPanel extends LitElement {
 
   private get pendingCount() {
     return Object.keys(this.staged).length +
+      (this.rulesDraft ? 1 : 0) +
       (this.strategy === "rule_based" || this.exposeNewEntities === this.baseExposeNewEntities ? 0 : 1);
   }
 
   private get strategy() {
+    if (this.rulesDraft) return "rule_based";
     return this.entitiesResponse?.strategy ?? this.status?.strategy ??
       (this.exposeNewEntities ? "blocklist" : "allowlist");
   }
 
   private get editingEnabled() {
+    if (this.rulesDraft && this.isConfigured() && !this.status?.read_only) return true;
     return this.status?.editing_enabled !== false && this.status?.read_only !== true;
   }
 
@@ -1242,6 +1346,16 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   static styles = css`
+    [hidden] { display: none !important; }
+    .section-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .section-nav [aria-current="page"] { border-color: var(--primary-color, #03a9f4); color: var(--primary-color, #03a9f4); }
+    .rules-editor { padding: 20px; }
+    .rules-editor p { max-width: 75ch; line-height: 1.5; }
+    .rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+    .rules-grid label { display: grid; gap: 8px; }
+    .rules-grid textarea { box-sizing: border-box; width: 100%; resize: vertical; font: inherit; color: var(--primary-text-color, #212121); background: var(--card-background-color, #fff); border: 1px solid var(--divider-color, #ccc); border-radius: 4px; padding: 10px; }
+    .impact { margin-top: 16px; padding: 16px; border-left: 3px solid var(--primary-color, #03a9f4); }
+    @media (max-width: 600px) { .rules-grid { grid-template-columns: 1fr; } }
     :host {
       display: block;
       min-height: 100%;

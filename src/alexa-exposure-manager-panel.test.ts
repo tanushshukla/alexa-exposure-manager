@@ -137,6 +137,42 @@ afterEach(() => {
 });
 
 describe("alexa-exposure-manager-panel", () => {
+  it("edits native rules with an impact preview and saves them in the shared draft", async () => {
+    const responses = configuredResponses();
+    Object.assign(responses["alexa_exposure_manager/entities"] as object, {
+      filter: { include_domains: ["light"], exclude_entity_globs: ["switch.*_child_lock"] },
+      strategy: "rule_based",
+    });
+    responses["alexa_exposure_manager/preview"] = {
+      filter: { include_domains: ["light", "fan"], exclude_entity_globs: ["switch.*_child_lock"] },
+      strategy: "rule_based",
+      exposure: { "fan.bedroom": true },
+      impact: { exposed: ["fan.bedroom"], hidden: [] },
+      future_behavior: "Matching future entities follow these native rules.",
+    };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    expect(root.querySelectorAll("textarea[data-filter-key]")).toHaveLength(6);
+    const field = root.querySelector<HTMLTextAreaElement>('textarea[data-filter-key="include_domains"]')!;
+    expect(field.value).toBe("light");
+    field.value = "light\nfan";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await settle(panel);
+    expect(root.textContent).toContain("Preview required");
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    await settle(panel);
+    expect(root.textContent).toContain("fan.bedroom");
+    expect(root.textContent).toContain("1 newly exposed");
+    root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith(expect.objectContaining({
+      type: "alexa_exposure_manager/save",
+      filter_config: { include_domains: ["light", "fan"], exclude_entity_globs: ["switch.*_child_lock"] },
+    }));
+  });
+
   it("loads through Home Assistant and shows exact setup instructions until configured", async () => {
     const panel = await createPanel({
       "alexa_exposure_manager/status": {

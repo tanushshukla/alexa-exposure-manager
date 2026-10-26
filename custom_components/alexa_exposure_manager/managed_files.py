@@ -141,17 +141,20 @@ class ManagedFileTransaction:
         expose_new_entities: bool,
         entities: list[Mapping[str, Any]],
         known_entity_ids: Collection[str],
+        filter_config: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Render a proposed configuration without changing either file."""
         parsed = await self._executor(self._read_pair)
         if parsed.read_only_reasons:
             raise ManagedYamlReadOnlyError("; ".join(parsed.read_only_reasons))
-        filter_text, entity_text, exposure, entity_config = self._build_update(
+        filter_text, entity_text, exposure, entity_config = self._build_draft(
             parsed,
             expose_new_entities,
             entities,
             set(known_entity_ids),
+            filter_config,
         )
+        proposed = self._parse_pair(filter_text.encode(), entity_text.encode())
         return {
             "revision": parsed.revision,
             "entities_revision": parsed.entities_revision,
@@ -160,6 +163,8 @@ class ManagedFileTransaction:
             "entity_config": entity_config,
             "filter_yaml": filter_text,
             "entity_config_yaml": entity_text,
+            "filter": proposed.filter,
+            "strategy": proposed.strategy,
         }
 
     async def async_import_preview(
@@ -194,6 +199,7 @@ class ManagedFileTransaction:
         expose_new_entities: bool,
         entities: list[Mapping[str, Any]],
         known_entity_ids: Collection[str],
+        filter_config: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Save both files through one serialized, revision-checked transaction."""
         async with self._lock:
@@ -202,11 +208,12 @@ class ManagedFileTransaction:
             if parsed.read_only_reasons:
                 raise ManagedYamlReadOnlyError("; ".join(parsed.read_only_reasons))
 
-            filter_text, entity_text, _exposure, _entity_config = self._build_update(
+            filter_text, entity_text, _exposure, _entity_config = self._build_draft(
                 parsed,
                 expose_new_entities,
                 entities,
                 set(known_entity_ids),
+                filter_config,
             )
             return await self._async_commit_bytes(
                 filter_text.encode(),
@@ -367,6 +374,7 @@ class ManagedFileTransaction:
             "revision": saved.revision,
             "entities_revision": saved.entities_revision,
             "strategy": saved.strategy,
+            "filter": saved.filter,
             "expose_new_entities": saved.expose_new_entities,
             "restart_required": True,
             "last_validation": self.last_validation,
@@ -721,6 +729,80 @@ class ManagedFileTransaction:
             "read_only": bool(parsed.read_only_reasons),
             "read_only_reasons": parsed.read_only_reasons,
         }
+
+    def _build_draft(
+        self,
+        parsed: _ParsedPair,
+        expose_new_entities: bool,
+        entities: list[Mapping[str, Any]],
+        known_entity_ids: set[str],
+        filter_config: Mapping[str, Any] | None,
+    ) -> tuple[str, str, dict[str, bool], dict[str, dict[str, Any]]]:
+        """Apply a native rule draft without normalizing away entries or patterns."""
+        if filter_config is None:
+            return self._build_update(
+                parsed, expose_new_entities, entities, known_entity_ids
+            )
+        from homeassistant.helpers.entityfilter import FILTER_SCHEMA
+
+        proposed, _, _ = self._validated_import_pair(filter_config, {})
+        rules = {key: list(values) for key, values in proposed.filter.items()}
+        metadata_changes: list[Mapping[str, Any]] = [
+            {key: value for key, value in change.items() if key != "exposed"}
+            for change in entities
+            if not change.get("remove")
+        ]
+        # Reuse the existing metadata validation, independently of rule strategy.
+        _, _, _, metadata = self._build_update(
+            parsed, parsed.expose_new_entities, metadata_changes, known_entity_ids
+        )
+        for change in entities:
+            entity_id = change.get("entity_id")
+            if not isinstance(entity_id, str) or not _ENTITY_ID.fullmatch(entity_id):
+                raise InvalidManagedConfigurationError(
+                    f"Invalid entity ID: {entity_id!r}"
+                )
+            if change.get("remove") or "exposed" in change:
+                for key in _ENTITY_FILTER_KEYS:
+                    if key in rules:
+                        rules[key] = [
+                            value for value in rules[key] if value != entity_id
+                        ]
+            if change.get("remove"):
+                metadata.pop(entity_id, None)
+            elif "exposed" in change:
+                if not isinstance(change["exposed"], bool):
+                    raise InvalidManagedConfigurationError(
+                        "Exposure must be true or false"
+                    )
+                key = "include_entities" if change["exposed"] else "exclude_entities"
+                rules.setdefault(key, []).append(entity_id)
+        try:
+            native_filter = FILTER_SCHEMA(rules)
+        except Exception as error:
+            raise InvalidManagedConfigurationError(
+                f"Invalid native filter: {error}"
+            ) from error
+        universe = known_entity_ids | parsed.configured_entity_ids | set(metadata)
+        universe |= {
+            value for key in _ENTITY_FILTER_KEYS for value in rules.get(key, [])
+        }
+        exposure = {
+            entity_id: bool(native_filter(entity_id)) for entity_id in sorted(universe)
+        }
+        for change in entities:
+            if "exposed" in change and not change.get("remove"):
+                if exposure[str(change["entity_id"])] != change["exposed"]:
+                    raise InvalidManagedConfigurationError(
+                        "This explicit exception cannot represent the requested "
+                        "exposure with the native filter; edit the filter rules instead"
+                    )
+        return (
+            self._render_filter_config(rules),
+            self._render_entity_config(metadata),
+            exposure,
+            metadata,
+        )
 
     def _build_update(
         self,
