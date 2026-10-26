@@ -22,6 +22,59 @@ async def valid():
     return None
 
 
+@pytest.mark.asyncio
+async def test_use_rules_removes_both_explicit_lists_but_preserves_metadata(
+    runtime, hass
+):
+    hass.states.async_set("light.room", "on")
+    rules = {
+        "include_domains": ["light"],
+        "include_entities": ["light.room"],
+        "exclude_entities": ["light.room", "light.room"],
+    }
+    preview = await runtime.async_preview(
+        {
+            "expose_new_entities": False,
+            "filter_config": rules,
+            "entities": [
+                {"entity_id": "light.room", "use_rules": True, "name": "Room"}
+            ],
+        }
+    )
+    assert preview["filter"]["include_entities"] == []
+    assert preview["filter"]["exclude_entities"] == []
+    assert preview["entity_config"]["light.room"] == {"name": "Room"}
+    assert preview["exposure"]["light.room"] is True
+    assert preview["reasons"]["light.room"] == "Included by domain: light"
+
+
+@pytest.mark.parametrize(
+    ("rules", "expected"),
+    [
+        (
+            {"include_domains": ["light"], "exclude_entities": ["light.room"]},
+            "Explicitly excluded",
+        ),
+        (
+            {"include_entity_globs": ["light.*"], "exclude_entity_globs": ["*.room"]},
+            "Included by glob: light.*",
+        ),
+        (
+            {"exclude_domains": ["light"], "include_entities": ["light.room"]},
+            "Explicitly included",
+        ),
+        ({"include_entities": ["switch.other"]}, "Not matched by include rules"),
+        ({"exclude_domains": ["switch"]}, "Included by default (no exclusion matched)"),
+    ],
+)
+async def test_preview_explains_native_precedence(runtime, hass, rules, expected):
+    hass.states.async_set("light.room", "on")
+    preview = await runtime.async_preview(
+        {"expose_new_entities": False, "filter_config": rules}
+    )
+    assert preview["reasons"]["light.room"] == expected
+
+
 @pytest.fixture
 async def runtime(hass, tmp_path):
     hass.config.config_dir = str(tmp_path)

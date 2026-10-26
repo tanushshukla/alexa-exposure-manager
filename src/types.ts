@@ -133,6 +133,7 @@ export interface AlexaEntity {
   missing: boolean;
   unsupportedReason: string;
   exposed: boolean;
+  exposureReason?: string;
   exposure: "include" | "exclude" | "inherited" | "new";
   alexaName: string;
   description: string;
@@ -141,6 +142,7 @@ export interface AlexaEntity {
 }
 
 export interface EntityDraft {
+  useRules?: boolean;
   exposed: boolean;
   name: string;
   description: string;

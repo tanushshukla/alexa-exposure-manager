@@ -522,7 +522,7 @@ export class AlexaExposureManagerPanel extends LitElement {
 
   private renderEntity(entity: AlexaEntity) {
     const draft = this.staged[entity.entityId];
-    const exposed = draft?.exposed ?? entity.exposed;
+    const exposed = this.draftPreview?.exposure?.[entity.entityId] ?? draft?.exposed ?? entity.exposed;
     const actionLabel = exposed
       ? t("hideEntity", { name: entity.name })
       : t("exposeEntity", { name: entity.name });
@@ -555,6 +555,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         </div>
         <div class="exposure" role="cell">
           <span class=${exposed ? "exposed" : "hidden"}>${exposed ? t("exposed") : t("hidden")}</span>
+          <small>${this.draftPreview?.reasons?.[entity.entityId] ?? (this.pendingCount ? "Draft exposure preview required" : entity.exposureReason)}</small>
           <button
             class="toggle"
             type="button"
@@ -566,6 +567,7 @@ export class AlexaExposureManagerPanel extends LitElement {
           ><span></span></button>
         </div>
         <div role="cell" class="row-actions">
+          ${!entity.missing ? html`<button class="text-button" type="button" aria-label=${`Use rules for ${entity.name}`} ?disabled=${this.saving || this.status?.read_only} @click=${() => this.useRules(entity)}>Use rules</button>` : nothing}
           ${entity.missing
             ? html`<button class="icon" type="button" aria-label=${t("removeMissing", { name: entity.name })} ?disabled=${!this.editingEnabled} @click=${() => this.stageRemove(entity)}><ha-icon icon="mdi:delete-outline"></ha-icon></button>`
             : html`<button class="icon" type="button" aria-label=${t("editMetadata", { name: entity.name })} ?disabled=${!this.editingEnabled} @click=${(event: Event) => this.openMetadataDialog(entity, event)}><ha-icon icon="mdi:pencil"></ha-icon></button>`}
@@ -582,9 +584,18 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.validationIssues = [];
   }
 
+  private async useRules(entity: AlexaEntity) {
+    this.rulesDraft = this.rulesDraft ?? structuredClone(this.entitiesResponse?.filter ?? {});
+    this.staged = { ...this.staged, [entity.entityId]: {
+      ...(this.staged[entity.entityId] ?? this.draftFrom(entity)), useRules: true,
+    } };
+    await this.updateComplete;
+    await this.previewDraft();
+  }
+
   private stageExposure(entity: AlexaEntity, exposed: boolean) {
     const draft = this.staged[entity.entityId] ?? this.draftFrom(entity);
-    const next = { ...draft, exposed };
+    const next = { ...draft, exposed, useRules: false };
     const unchanged =
       next.exposed === entity.exposed &&
       next.name === entity.alexaName &&
@@ -699,7 +710,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         ? { entity_id: entityId, remove: true }
         : {
             entity_id: entityId,
-            ...(!this.rulesDraft || draft.exposed !== this.normalizedEntities.find((entity) => entity.entityId === entityId)?.exposed ? { exposed: draft.exposed } : {}),
+            ...(draft.useRules ? { use_rules: true } : !this.rulesDraft || draft.exposed !== this.normalizedEntities.find((entity) => entity.entityId === entityId)?.exposed ? { exposed: draft.exposed } : {}),
             name: draft.name,
             description: draft.description,
             display_categories: draft.displayCategories.slice(0, 1),
@@ -1314,6 +1325,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       missing,
       unsupportedReason: String(raw.unsupported_reason ?? ""),
       exposed,
+      exposureReason: String(raw.exposure_reason ?? ""),
       exposure: (raw.exposure === "include" || raw.exposure === "exclude" || raw.exposure === "inherited" || raw.exposure === "new")
         ? raw.exposure
         : exposed ? "include" : "exclude",

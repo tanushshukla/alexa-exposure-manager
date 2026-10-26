@@ -739,13 +739,17 @@ class ManagedFileTransaction:
         filter_config: Mapping[str, Any] | None,
     ) -> tuple[str, str, dict[str, bool], dict[str, dict[str, Any]]]:
         """Apply a native rule draft without normalizing away entries or patterns."""
-        if filter_config is None:
+        if filter_config is None and not any(
+            change.get("use_rules") for change in entities
+        ):
             return self._build_update(
                 parsed, expose_new_entities, entities, known_entity_ids
             )
         from homeassistant.helpers.entityfilter import FILTER_SCHEMA
 
-        proposed, _, _ = self._validated_import_pair(filter_config, {})
+        proposed, _, _ = self._validated_import_pair(
+            parsed.filter if filter_config is None else filter_config, {}
+        )
         rules = {key: list(values) for key, values in proposed.filter.items()}
         metadata_changes: list[Mapping[str, Any]] = [
             {key: value for key, value in change.items() if key != "exposed"}
@@ -762,7 +766,7 @@ class ManagedFileTransaction:
                 raise InvalidManagedConfigurationError(
                     f"Invalid entity ID: {entity_id!r}"
                 )
-            if change.get("remove") or "exposed" in change:
+            if change.get("remove") or change.get("use_rules") or "exposed" in change:
                 for key in _ENTITY_FILTER_KEYS:
                     if key in rules:
                         rules[key] = [
@@ -770,7 +774,7 @@ class ManagedFileTransaction:
                         ]
             if change.get("remove"):
                 metadata.pop(entity_id, None)
-            elif "exposed" in change:
+            elif "exposed" in change and not change.get("use_rules"):
                 if not isinstance(change["exposed"], bool):
                     raise InvalidManagedConfigurationError(
                         "Exposure must be true or false"
@@ -791,7 +795,11 @@ class ManagedFileTransaction:
             entity_id: bool(native_filter(entity_id)) for entity_id in sorted(universe)
         }
         for change in entities:
-            if "exposed" in change and not change.get("remove"):
+            if (
+                "exposed" in change
+                and not change.get("remove")
+                and not change.get("use_rules")
+            ):
                 if exposure[str(change["entity_id"])] != change["exposed"]:
                     raise InvalidManagedConfigurationError(
                         "This explicit exception cannot represent the requested "

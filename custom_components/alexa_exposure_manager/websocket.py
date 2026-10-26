@@ -25,6 +25,7 @@ ENTITY_UPDATE_SCHEMA = {
     vol.Required("entity_id"): str,
     vol.Optional("exposed"): bool,
     vol.Optional("remove"): bool,
+    vol.Optional("use_rules"): bool,
     vol.Optional("name"): vol.Any(str, None),
     vol.Optional("description"): vol.Any(str, None),
     # Home Assistant validates alexa.smart_home entity_config display_categories

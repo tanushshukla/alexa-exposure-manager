@@ -21,6 +21,7 @@ from .const import (
     VERSION,
 )
 from .diagnostics import build_redacted_diagnostics
+from .filter_rules import exposure_reason
 from .managed_files import (
     InvalidManagedConfigurationError,
     ManagedFileTransaction,
@@ -313,6 +314,7 @@ class AlexaExposureManagerRuntime:
             entity.update(
                 {
                     "exposed": exposed,
+                    "exposure_reason": exposure_reason(entity_id, snapshot["filter"]),
                     "exposure": "include" if exposed else "exclude",
                     "alexa_name": metadata.get("name", ""),
                     "description": metadata.get("description", ""),
@@ -390,6 +392,10 @@ class AlexaExposureManagerRuntime:
                 and entity["exposed"]
                 and not preview["exposure"].get(entity["entity_id"], False)
             ],
+        }
+        preview["reasons"] = {
+            entity_id: exposure_reason(entity_id, preview["filter"])
+            for entity_id in preview["exposure"]
         }
         preview["future_behavior"] = (
             "No filter rules: future entities use Alexa registry-default exposure. "

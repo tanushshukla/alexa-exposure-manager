@@ -137,6 +137,27 @@ afterEach(() => {
 });
 
 describe("alexa-exposure-manager-panel", () => {
+  it("uses native rules without removing metadata and shows draft reasons", async () => {
+    const responses = configuredResponses();
+    Object.assign(responses["alexa_exposure_manager/entities"] as object, {
+      filter: { include_domains: ["light"], exclude_entities: ["light.kitchen_ceiling"] },
+    });
+    responses["alexa_exposure_manager/preview"] = {
+      exposure: { "light.kitchen_ceiling": true },
+      reasons: { "light.kitchen_ceiling": "Included by domain: light" },
+      impact: { exposed: ["light.kitchen_ceiling"], hidden: [] },
+    };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Use rules for Kitchen ceiling"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith(expect.objectContaining({
+      type: "alexa_exposure_manager/preview",
+      entities: expect.arrayContaining([expect.objectContaining({ entity_id: "light.kitchen_ceiling", use_rules: true })]),
+    }));
+    expect(root.textContent).toContain("Included by domain: light");
+  });
+
   it("edits native rules with an impact preview and saves them in the shared draft", async () => {
     const responses = configuredResponses();
     Object.assign(responses["alexa_exposure_manager/entities"] as object, {
