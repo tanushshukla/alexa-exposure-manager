@@ -5,6 +5,8 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-27
+
 ### Added
 
 - Native six-section filter editing with staged exposure-impact previews (#59).
@@ -173,7 +175,8 @@ uses semantic versioning once releases are published.
 - Home Assistant `2026.8.1` with
   `pytest-homeassistant-custom-component==0.13.355`.
 
-[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.8
 [0.1.7]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.7
 [0.1.6]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.6
 [0.1.5]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.5
