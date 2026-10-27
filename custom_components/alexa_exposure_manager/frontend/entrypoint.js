@@ -1073,7 +1073,7 @@ var Q = [
 					displayCategories: [],
 					remove: !0
 				};
-				this.staged = n, this.cleanupFindings = void 0, this.cleanupSelection = [], this.cleanupNotice = "Cleanup staged. Preview exposure changes, then Save to commit or Discard to cancel.", await this.updateComplete, await this.previewDraft();
+				this.staged = n, this.cleanupFindings = void 0, this.cleanupSelection = [], this.cleanupNotice = "Cleanup staged. Select Preview changes, then Save changes in the review to commit or Discard changes to cancel.", await this.updateComplete, await this.previewDraft();
 			} catch (e) {
 				this.saveError = this.errorMessage(e);
 			} finally {

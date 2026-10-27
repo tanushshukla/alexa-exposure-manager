@@ -562,7 +562,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       this.staged = staged;
       this.cleanupFindings = undefined;
       this.cleanupSelection = [];
-      this.cleanupNotice = "Cleanup staged. Preview exposure changes, then Save to commit or Discard to cancel.";
+      this.cleanupNotice = "Cleanup staged. Select Preview changes, then Save changes in the review to commit or Discard changes to cancel.";
       await this.updateComplete;
       await this.previewDraft();
     } catch (error) { this.saveError = this.errorMessage(error); }
