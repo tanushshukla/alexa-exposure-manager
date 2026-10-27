@@ -137,6 +137,176 @@ afterEach(() => {
 });
 
 describe("alexa-exposure-manager-panel", () => {
+  it("replaces Use rules with explicit intent for a subsequent bulk action", async () => {
+    const panel = await createPanel(configuredResponses());
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Use rules for Kitchen ceiling"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLInputElement>('[aria-label="Select Kitchen ceiling for bulk action"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Unexpose selected entities"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Confirm unexpose"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    await settle(panel);
+    const request = panel.hass.connection.sendMessagePromise.mock.calls.at(-1)![0];
+    expect(request.entities).toEqual([expect.objectContaining({entity_id:"light.kitchen_ceiling", exposed:false})]);
+    expect((request.entities as Record<string, unknown>[])[0]).not.toHaveProperty("use_rules");
+  });
+
+  it("materializes a pending mode change and metadata before Use rules", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = {filter:{exclude_entities:["fan.bedroom"]}};
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Edit Alexa metadata for Kitchen ceiling"]')!.click();
+    await settle(panel);
+    const name = root.querySelector<HTMLInputElement>('[aria-label="Alexa name"]')!;
+    name.value="Custom kitchen";
+    name.dispatchEvent(new Event("input",{bubbles:true}));
+    root.querySelector<HTMLButtonElement>('[aria-label="Apply Alexa metadata"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Expose new entities automatically"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Use rules for Kitchen ceiling"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
+      filter_config:{exclude_entities:["fan.bedroom"]},
+      entities:expect.arrayContaining([expect.objectContaining({entity_id:"light.kitchen_ceiling", use_rules:true, name:"Custom kitchen"})]),
+    }));
+  });
+
+  it.each(["save", "restore"])("locks entity and mode editing while %s is in flight", async (operation) => {
+    const panel = await createPanel(configuredResponses());
+    const root = panel.shadowRoot!;
+    if (operation === "save") {
+      root.querySelector<HTMLButtonElement>('[aria-label="Hide Kitchen ceiling"]')!.click();
+      await settle(panel);
+    } else {
+      root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
+      await settle(panel);
+      root.querySelector<HTMLButtonElement>('[aria-label="Restore backup backup-7"]')!.click();
+      await settle(panel);
+    }
+    let resolve!: (value: unknown) => void;
+    panel.hass.connection.sendMessagePromise.mockImplementationOnce(() => new Promise(done=>{resolve=done;}));
+    root.querySelector<HTMLButtonElement>(operation === "save" ? '[aria-label="Save changes"]' : '[aria-label="Confirm restore"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Entities"]')!.click();
+    await settle(panel);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Expose Bedroom fan"]')!.disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Edit Alexa metadata for Bedroom fan"]')!.disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Expose new entities automatically"]')!.disabled).toBe(true);
+    root.querySelector<HTMLButtonElement>('[aria-label="Expose Bedroom fan"]')!.click();
+    resolve({revision: "config-r5", restart_required: true});
+    await settle(panel);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.disabled).toBe(true);
+  });
+
+  it.each([
+    ["fan.bedroom", "Bedroom fan", true, false],
+    ["light.kitchen_ceiling", "Kitchen ceiling", false, true],
+  ])("keeps explicit exposure intent against edited native rules for %s", async (id, name, ruleExposure, requested) => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = { exposure: { [id]: ruleExposure } };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    const field = root.querySelector<HTMLTextAreaElement>('[data-filter-key="include_domains"]')!;
+    field.value = "fan";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Entities"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>(`[aria-label="${requested ? "Expose" : "Hide"} ${name}"]`)!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
+      entities: expect.arrayContaining([expect.objectContaining({ entity_id: id, exposed: requested })]),
+    }));
+  });
+
+  it("reloads authoritative rules and reasons after an ordinary save", async () => {
+    const responses = configuredResponses();
+    Object.assign(responses["alexa_exposure_manager/entities"] as object, {filter: {include_entities: ["light.kitchen_ceiling"]}});
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Hide Kitchen ceiling"]')!.click();
+    await settle(panel);
+    const catalog = responses["alexa_exposure_manager/entities"] as {entities: Record<string, unknown>[]};
+    responses["alexa_exposure_manager/entities"] = {...catalog, filter: {include_entities: ["lock.front_door"]}, entities: catalog.entities.map(e=>({...e, exposed: e.entity_id === "light.kitchen_ceiling" ? false : e.exposed, exposure_reason: "Not matched by include rules"}))};
+    root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.click();
+    await settle(panel);
+    expect(root.textContent).toContain("Not matched by include rules");
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    expect(root.querySelector<HTMLTextAreaElement>('[data-filter-key="include_entities"]')!.value).toBe("lock.front_door");
+  });
+
+  it("traps confirmation focus and restores keyboard focus after Escape", async () => {
+    const panel = await createPanel(configuredResponses());
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
+    await settle(panel);
+    const trigger = root.querySelector<HTMLButtonElement>('[aria-label="Restore backup backup-7"]')!;
+    trigger.focus();
+    trigger.click();
+    await settle(panel);
+    const dialog = root.querySelector<HTMLElement>('[role="alertdialog"]')!;
+    const buttons = dialog.querySelectorAll<HTMLButtonElement>("footer button");
+    buttons[1]!.focus();
+    buttons[1]!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    expect(root.activeElement).toBe(buttons[0]);
+    dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await settle(panel);
+    expect(root.activeElement).toBe(trigger);
+  });
+
+  it("rejects an out-of-order rule preview and preserves the newer pending draft", async () => {
+    const panel = await createPanel(configuredResponses());
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    const field = root.querySelector<HTMLTextAreaElement>('[data-filter-key="include_domains"]')!;
+    field.value = "light";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await settle(panel);
+    let resolve!: (value: unknown) => void;
+    panel.hass.connection.sendMessagePromise.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    field.value = "fan";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await settle(panel);
+    resolve({ impact: { exposed: ["light.stale"], hidden: [] } });
+    await settle(panel);
+    expect(root.textContent).not.toContain("light.stale");
+    root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.click();
+    await settle(panel);
+    expect(root.textContent).toContain("Preview required");
+    expect(panel.hass.connection.sendMessagePromise).not.toHaveBeenCalledWith(expect.objectContaining({ type: "alexa_exposure_manager/save" }));
+  });
+
+  it("preserves a simple mode change when rule editing starts", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = { filter: { exclude_entities: ["fan.bedroom"] } };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Expose new entities automatically"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    expect(root.querySelector<HTMLTextAreaElement>('[data-filter-key="exclude_entities"]')!.value).toContain("fan.bedroom");
+  });
+
   it("shows recovery directly in Settings and blocks unhealthy or pending-edit restores", async () => {
     const responses = configuredResponses();
     responses["alexa_exposure_manager/backups"] = { backups: [
@@ -852,6 +1022,8 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
     expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith({
       type: "alexa_exposure_manager/preview",
+      expected_revision: "config-r4",
+      expected_entities_revision: "entities-r9",
       expose_new_entities: false,
       entities: [],
     });

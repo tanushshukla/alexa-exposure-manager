@@ -368,14 +368,14 @@ export class AlexaExposureManagerPanel extends LitElement {
 
         <nav class="section-nav" aria-label="Exposure manager sections">
           <button class="secondary" type="button" aria-label="Entities" aria-current=${this.section === "entities" ? "page" : nothing} @click=${() => { this.section = "entities"; }}>Entities</button>
-          <button class="secondary" type="button" aria-label="Filter rules" aria-current=${this.section === "rules" ? "page" : nothing} @click=${() => { this.section = "rules"; }}>Filter rules</button>
+          <button class="secondary" type="button" aria-label="Filter rules" aria-current=${this.section === "rules" ? "page" : nothing} @click=${this.openRules}>Filter rules</button>
           <button class="secondary" type="button" aria-label="Settings" aria-current=${this.section === "settings" ? "page" : nothing} @click=${() => { this.section = "settings"; void this.loadAdvanced(); }}>Settings</button>
           ${this.pendingCount ? html`<button class="text-button" type="button" aria-label="Discard changes" ?disabled=${this.saving} @click=${this.discard}>Discard changes</button>` : nothing}
         </nav>
 
         ${this.renderConfiguredMigration()}
         ${this.status?.restart_required ? this.renderRestartBanner() : nothing}
-        ${!this.editingEnabled
+        ${!this.saving && !this.editingEnabled
           ? html`<section class="message error" role="alert"><strong>${t(this.strategy === "registry_default" ? "registryDefaultTitle" : "readOnlyTitle")}</strong><span>${this.strategy === "registry_default" ? t("registryDefaultBody") : `${t("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}`}</span></section>`
           : nothing}
         ${this.saveError
@@ -433,6 +433,7 @@ export class AlexaExposureManagerPanel extends LitElement {
                       aria-label=${t("exposeNewLabel")}
                       ?disabled=${!this.editingEnabled}
                       @click=${() => {
+                        if (!this.editingEnabled) return;
                         this.exposeNewEntities = !this.exposeNewEntities;
                         this.saveError = "";
                       }}
@@ -485,8 +486,26 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.cleanupNotice = "";
   }
 
+  private async materializeFilter() {
+    if (this.saving) return false;
+    if (!this.rulesDraft && this.exposeNewEntities !== this.baseExposeNewEntities && this.hass) {
+      const fingerprint = this.draftFingerprint();
+      try {
+        const result = await this.hass.connection.sendMessagePromise<DraftPreview>(this.previewMessage());
+        if (this.saving || fingerprint !== this.draftFingerprint()) return false;
+        this.rulesDraft = result.filter ?? {};
+      } catch (error) { this.saveError = this.errorMessage(error); return false; }
+    }
+    return true;
+  }
+
+  private async openRules() {
+    if (!await this.materializeFilter()) return;
+    this.section = "rules";
+  }
+
   private async checkCleanup(checks: string[]) {
-    if (!this.hass) return;
+    if (!this.hass || this.saving || this.status?.read_only) return;
     this.cleanupBusy = true;
     this.cleanupNotice = "";
     this.cleanupFindings = undefined;
@@ -505,13 +524,13 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private async stageCleanup() {
-    if (!this.hass || this.cleanupFingerprint !== this.draftFingerprint()) return;
+    if (!this.hass || this.saving || this.status?.read_only || this.cleanupFingerprint !== this.draftFingerprint()) return;
     this.cleanupBusy = true;
     try {
       const result = await this.hass.connection.sendMessagePromise<DraftPreview>({
         ...this.previewMessage(), cleanup_checks: this.cleanupChecks, cleanup_selected: this.cleanupSelection,
       });
-      if (this.cleanupFingerprint !== this.draftFingerprint()) return;
+      if (this.saving || this.cleanupFingerprint !== this.draftFingerprint()) return;
       this.rulesDraft = result.filter ?? {};
       const missing = result.cleanup_missing ?? [];
       this.cleanupMissing = [...new Set([...this.cleanupMissing, ...missing])];
@@ -547,7 +566,7 @@ export class AlexaExposureManagerPanel extends LitElement {
             this.cleanupSelection = (event.currentTarget as HTMLInputElement).checked ? [...this.cleanupSelection, finding.id] : this.cleanupSelection.filter((id) => id !== finding.id);
           }} /> <code>${finding.value}</code> — ${finding.kind === "missing" ? "Missing from registry and current states; remove explicit references and metadata" : `${finding.section}: ${finding.count} extra occurrence(s)`}
         </label></li>`)}</ul>` : html`<p role="status">No cleanup findings.</p>`}
-        <button type="button" aria-label="Stage selected cleanup" ?disabled=${stale || this.cleanupBusy || !this.cleanupSelection.length} @click=${this.stageCleanup}>Stage selected cleanup</button>
+        <button type="button" aria-label="Stage selected cleanup" ?disabled=${this.saving || this.status?.read_only || stale || this.cleanupBusy || !this.cleanupSelection.length} @click=${this.stageCleanup}>Stage selected cleanup</button>
       ` : nothing}
     </section>`;
   }
@@ -670,6 +689,8 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private async useRules(entity: AlexaEntity) {
+    if (!this.editingEnabled) return;
+    if (!await this.materializeFilter() || !this.editingEnabled) return;
     this.rulesDraft = this.rulesDraft ?? structuredClone(this.entitiesResponse?.filter ?? {});
     this.staged = { ...this.staged, [entity.entityId]: {
       ...(this.staged[entity.entityId] ?? this.draftFrom(entity)), useRules: true,
@@ -679,10 +700,11 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private stageExposure(entity: AlexaEntity, exposed: boolean) {
+    if (!this.editingEnabled) return;
     const draft = this.staged[entity.entityId] ?? this.draftFrom(entity);
-    const next = { ...draft, exposed, useRules: false };
+    const next = { ...draft, exposed, useRules: false, exposureChanged: true };
     const unchanged =
-      next.exposed === entity.exposed &&
+      !this.rulesDraft && next.exposed === entity.exposed &&
       next.name === entity.alexaName &&
       next.description === entity.description &&
       next.displayCategories.join("|") === entity.displayCategories.join("|");
@@ -695,7 +717,7 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private async save() {
-    if (!this.hass || !this.pendingCount) return;
+    if (!this.hass || !this.pendingCount || !this.editingEnabled) return;
     if (this.rulesDraft && this.previewFingerprint !== this.draftFingerprint()) {
       this.saveError = "Preview required. Review exposure changes before saving filter rules.";
       return;
@@ -708,41 +730,11 @@ export class AlexaExposureManagerPanel extends LitElement {
         this.validationIssues = response.validation_errors;
         return;
       }
-      const savedDrafts = this.staged;
-      this.status = { ...this.status, expose_new_entities: this.exposeNewEntities, ...response };
-      this.entitiesResponse = {
-        ...this.entitiesResponse,
-        revision: response.revision ?? this.entitiesResponse?.revision,
-        entities_revision: response.entities_revision ?? this.entitiesResponse?.entities_revision,
-        expose_new_entities: this.exposeNewEntities,
-        entities: this.normalizedEntities.map((entity) => {
-          const draft = savedDrafts[entity.entityId];
-          return {
-            entity_id: entity.entityId,
-            name: entity.name,
-            state: entity.state,
-            area_name: entity.areaName,
-            device_name: entity.deviceName,
-            integration: entity.integration,
-            supported: entity.supported,
-            missing: entity.missing,
-            unsupported_reason: entity.unsupportedReason,
-            exposed: draft?.exposed ?? entity.exposed,
-            exposure: draft ? (draft.exposed ? "include" : "exclude") : entity.exposure,
-            alexa_name: draft?.name ?? entity.alexaName,
-            description: draft?.description ?? entity.description,
-            display_categories: draft?.displayCategories ?? entity.displayCategories,
-            inferred_display_category: entity.inferredDisplayCategory,
-          };
-        }),
-      };
-      this.baseExposeNewEntities = this.exposeNewEntities;
       this.staged = {};
       this.cleanupMissing = [];
-      if (this.rulesDraft) {
-        this.rulesDraft = undefined;
-        await this.load();
-      }
+      this.rulesDraft = undefined;
+      await this.load();
+      this.status = { ...this.status, ...response };
       this.previewResponse = undefined;
       this.backupsResponse = undefined;
     } catch (error) {
@@ -785,6 +777,8 @@ export class AlexaExposureManagerPanel extends LitElement {
   private previewMessage() {
     return {
       type: "alexa_exposure_manager/preview",
+      expected_revision: this.status?.revision ?? "",
+      expected_entities_revision: this.entitiesResponse?.entities_revision ?? this.status?.entities_revision ?? "",
       expose_new_entities: this.exposeNewEntities,
       entities: this.entityUpdates(),
       ...(this.rulesDraft ? { filter_config: this.rulesDraft } : {}),
@@ -797,7 +791,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         ? { entity_id: entityId, remove: true }
         : {
             entity_id: entityId,
-            ...(draft.useRules ? { use_rules: true } : !this.rulesDraft || draft.exposed !== this.normalizedEntities.find((entity) => entity.entityId === entityId)?.exposed ? { exposed: draft.exposed } : {}),
+            ...(draft.useRules ? { use_rules: true } : draft.exposureChanged || !this.rulesDraft ? { exposed: draft.exposed } : {}),
             name: draft.name,
             description: draft.description,
             display_categories: draft.displayCategories.slice(0, 1),
@@ -818,6 +812,7 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private get editingEnabled() {
+    if (this.saving) return false;
     if (this.rulesDraft && this.isConfigured() && !this.status?.read_only) return true;
     return this.status?.editing_enabled !== false && this.status?.read_only !== true;
   }
@@ -998,15 +993,16 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private confirmBulkAction() {
+    if (!this.editingEnabled) return;
     const byId = new Map(this.normalizedEntities.map((entity) => [entity.entityId, entity]));
     const staged = { ...this.staged };
     const exposed = this.bulkAction === "expose";
     for (const entityId of this.selectedEntities) {
       const entity = byId.get(entityId);
       if (!entity || (!entity.supported && exposed)) continue;
-      const next = { ...(staged[entityId] ?? this.draftFrom(entity)), exposed, remove: undefined };
+      const next = { ...(staged[entityId] ?? this.draftFrom(entity)), exposed, remove: undefined, useRules: false, exposureChanged: true };
       if (
-        entity.exposed === exposed &&
+        !this.rulesDraft && entity.exposed === exposed &&
         next.name === entity.alexaName &&
         next.description === entity.description &&
         next.displayCategories.join("|") === entity.displayCategories.join("|")
@@ -1099,7 +1095,7 @@ export class AlexaExposureManagerPanel extends LitElement {
           </div>
           <footer>
             <button class="secondary" type="button" @click=${this.closeMetadataDialog}>${t("cancel")}</button>
-            <button type="button" aria-label=${t("applyMetadata")} @click=${this.applyMetadata}>${t("applyMetadata")}</button>
+            <button type="button" aria-label=${t("applyMetadata")} ?disabled=${!this.editingEnabled} @click=${this.applyMetadata}>${t("applyMetadata")}</button>
           </footer>
         </section>
       </div>
@@ -1109,10 +1105,10 @@ export class AlexaExposureManagerPanel extends LitElement {
 
 
   private applyMetadata() {
-    if (!this.metadataEntityId || !this.metadataDraft) return;
+    if (!this.editingEnabled || !this.metadataEntityId || !this.metadataDraft) return;
     const entity = this.normalizedEntities.find((item) => item.entityId === this.metadataEntityId);
     if (!entity) return;
-    const unchanged = this.metadataDraft.exposed === entity.exposed &&
+    const unchanged = !this.metadataDraft.useRules && !this.metadataDraft.exposureChanged && this.metadataDraft.exposed === entity.exposed &&
       this.metadataDraft.name === entity.alexaName &&
       this.metadataDraft.description === entity.description &&
       this.metadataDraft.displayCategories.join("|") === entity.displayCategories.join("|");
@@ -1273,6 +1269,14 @@ export class AlexaExposureManagerPanel extends LitElement {
       <div class="dialog-backdrop">
         <section class="dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="operation-confirm-title" @keydown=${(event: KeyboardEvent) => {
           if (event.key === "Escape") this.closeOperationConfirmation();
+          if (event.key === "Tab") {
+            const controls = (event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>("button:not(:disabled)");
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            const active = (this.renderRoot as ShadowRoot).activeElement;
+            if (event.shiftKey && active === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && active === last) { event.preventDefault(); first?.focus(); }
+          }
         }}>
           <header><div><h2 id="operation-confirm-title">${title}</h2><p>${body}</p></div></header>
           <footer><button class="secondary" type="button" @click=${this.closeOperationConfirmation}>${t("cancel")}</button><button class=${action === "restore" ? "danger" : ""} type="button" aria-label=${confirmLabel} @click=${this.confirmOperation}>${confirmLabel}</button></footer>
@@ -1290,6 +1294,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     if (!this.hass || !this.confirmation) return;
     const action = this.confirmation;
     const target = this.confirmationTarget;
+    let restoring = false;
     this.closeOperationConfirmation();
     try {
       if (action === "restore") {
@@ -1297,6 +1302,8 @@ export class AlexaExposureManagerPanel extends LitElement {
           this.advancedError = "Save or Discard pending changes before restoring a backup.";
           return;
         }
+        this.saving = true;
+        restoring = true;
         const response = await this.hass.connection.sendMessagePromise<StatusResponse>({
           type: "alexa_exposure_manager/restore",
           backup_id: target ?? "",
@@ -1337,6 +1344,8 @@ export class AlexaExposureManagerPanel extends LitElement {
       }
       else if (this.isConfigured()) this.advancedError = message;
       else this.error = message;
+    } finally {
+      if (restoring) this.saving = false;
     }
   }
 
@@ -1472,6 +1481,10 @@ export class AlexaExposureManagerPanel extends LitElement {
     [hidden] { display: none !important; }
     .section-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
     .section-nav [aria-current="page"] { border-color: var(--primary-color, #03a9f4); color: var(--primary-color, #03a9f4); }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--primary-color, #03a9f4); outline-offset: 3px; }
+    .exposure small { display: block; max-width: 26ch; color: var(--secondary-text-color, #616161); font-size: 12px; }
+    .rules-editor li { margin: 12px 0; overflow-wrap: anywhere; }
+    .rules-editor > button { margin: 4px 8px 4px 0; }
     .rules-editor { padding: 20px; }
     .rules-editor p { max-width: 75ch; line-height: 1.5; }
     .rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
@@ -1522,7 +1535,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     .row-actions { display: flex; justify-content: flex-end; gap: 4px; }
     .virtual-spacer { pointer-events: none; }
     .restart-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .table-head, .entity-row { display: grid; grid-template-columns: 24px minmax(260px, 1.35fr) minmax(190px, .9fr) minmax(190px, .9fr) minmax(170px, .7fr) 40px; align-items: center; gap: 18px; padding: 0 20px; }
+    .table-head, .entity-row { display: grid; grid-template-columns: 24px minmax(220px, 1.35fr) minmax(150px, .9fr) minmax(150px, .9fr) minmax(170px, .7fr) 130px; align-items: center; gap: 18px; padding: 0 20px; }
     .table-head { min-height: 44px; color: var(--secondary-text-color, #616161); background: var(--secondary-background-color, #f5f5f5); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
     .entity-row { min-height: 76px; border-top: 1px solid var(--divider-color, #e0e0e0); }
     .row-checkbox { width: 18px; min-height: 18px; }
@@ -1534,7 +1547,9 @@ export class AlexaExposureManagerPanel extends LitElement {
     .context small, .availability small { margin-top: 5px; color: var(--secondary-text-color, #616161); font-size: 12px; }
     .availability .ok { color: var(--success-color, #2e7d32); }
     .availability .warning { color: var(--warning-color, #f57c00); font-weight: 600; }
-    .exposure { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .entity-row .exposure { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 4px 12px; }
+    .exposure small { grid-column: 1; grid-row: 2; overflow-wrap: anywhere; }
+    .exposure .toggle { grid-column: 2; grid-row: 1 / 3; }
     .exposure > span { font-size: 13px; font-weight: 600; }
     .exposure .exposed { color: var(--primary-color, #03a9f4); }
     .toggle { position: relative; width: 44px; min-width: 44px; min-height: 40px; height: 40px; padding: 0; border-radius: 999px; background: transparent; }
@@ -1658,7 +1673,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (max-width: 900px) {
       main { padding: 20px; }
-      .table-head, .entity-row { grid-template-columns: 24px minmax(220px, 1.2fr) minmax(170px, .8fr) minmax(160px, .8fr) 40px; }
+      .table-head, .entity-row { grid-template-columns: 24px minmax(190px, 1.2fr) minmax(150px, .8fr) minmax(170px, .8fr) 130px; }
       .table-head > :nth-child(3), .entity-row > :nth-child(3) { display: none; }
     }
     @media (max-width: 620px) {

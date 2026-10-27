@@ -5,6 +5,28 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+### Added
+
+- Native six-section filter editing with staged exposure-impact previews (#59).
+- Native exposure explanations and **Use rules** to remove explicit exceptions
+  without deleting Alexa metadata (#60).
+- Selective duplicate and missing-reference cleanup, including combined checks,
+  shared pending edits, and save-time inventory revalidation (#61–#63).
+- Settings recovery with backup-pair health, local timestamps, pending-edit
+  protection, and authoritative reload after restoration (#64).
+- Integrated Entities / Filter rules / Settings navigation, shared Save/Discard,
+  keyboard-accessible confirmation, mobile layouts, and workflow documentation
+  (#65).
+
+### Fixed
+
+- Reject stale previews and preserve explicit exposure intent against edited
+  native rules, including bulk actions after **Use rules**.
+- Preserve pending simple-mode conversion and metadata when entering native
+  editing, and retain unselected duplicate order during cleanup.
+- Reload authoritative rules and exposure reasons after every save; lock draft
+  editing during save and restore so in-flight operations cannot erase new edits.
+
 ## [0.1.7] - 2026-08-12
 
 ### Added
@@ -160,16 +182,3 @@ uses semantic versioning once releases are published.
 [0.1.2]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.2
 [0.1.1]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.1
 [0.1.0]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.0
-# Unreleased
-
-- Put recovery in Settings, report backup pair health and local timestamps, block restore until pending edits are saved/discarded, and reload the catalog after restore (#64).
-
-- Run both cleanup checks together, count overlapping entity findings once, and invalidate cleanup results when the shared draft changes (#63).
-
-- Selectively remove missing explicit references and metadata; preserve registered/state-only entities and recheck inventory during save with rollback if an entity reappears (#62).
-
-- Preview and selectively stage exact duplicate rule cleanup, keeping first occurrences and overlapping rules (#61).
-
-- Explain native exposure decisions and remove explicit exceptions with Use rules without deleting metadata (#60).
-
-- Add a native six-section filter editor with staged changes and exposure-impact preview (#59).

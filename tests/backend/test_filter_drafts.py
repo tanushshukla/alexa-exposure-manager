@@ -23,6 +23,36 @@ async def valid():
     return None
 
 
+async def test_rule_preview_rejects_stale_expected_revision(runtime):
+    with pytest.raises(RevisionConflictError):
+        await runtime.async_preview(
+            {
+                "expose_new_entities": False,
+                "filter_config": {},
+                "expected_revision": "stale",
+                "expected_entities_revision": "stale",
+            }
+        )
+
+
+async def test_rule_draft_does_not_create_metadata_for_untouched_missing_references(
+    runtime,
+):
+    snapshot = await runtime.transaction.async_read()
+    await runtime.transaction.async_save(
+        expected_revision=snapshot["revision"],
+        expected_entities_revision=snapshot["entities_revision"],
+        expose_new_entities=True,
+        entities=[],
+        known_entity_ids=[],
+        filter_config={"exclude_entities": ["light.gone"]},
+    )
+    preview = await runtime.async_preview(
+        {"expose_new_entities": True, "filter_config": {"include_domains": ["light"]}}
+    )
+    assert preview["entity_config"] == {}
+
+
 async def test_backup_health_reports_corrupt_and_incomplete_pairs(tmp_path):
     managed = ManagedFileTransaction(tmp_path, execute, valid)
     await managed.async_initialize()
@@ -73,6 +103,33 @@ async def test_combined_cleanup_counts_overlapping_findings_once(runtime):
     )
     assert partial["filter"]["include_entities"] == ["light.gone"]
     assert partial["entity_config"]["light.gone"] == {"name": "Old"}
+
+
+async def test_simple_cleanup_preserves_unselected_duplicates(runtime, hass, tmp_path):
+    hass.states.async_set("light.z", "on")
+    hass.states.async_set("light.a", "on")
+    (tmp_path / "alexa_exposure_filter.yaml").write_text(
+        "include_entities: [light.z, light.a, light.z, light.a, light.gone]\n"
+    )
+    message = {
+        "expose_new_entities": False,
+        "cleanup_checks": ["duplicates", "missing"],
+    }
+    result = await runtime.async_preview(message)
+    assert {item["id"] for item in result["cleanup_findings"]} == {
+        "duplicate:include_entities:light.z",
+        "duplicate:include_entities:light.a",
+        "missing:light.gone",
+    }
+    result = await runtime.async_preview(
+        {**message, "cleanup_selected": ["missing:light.gone"]}
+    )
+    assert result["filter"]["include_entities"] == [
+        "light.z",
+        "light.a",
+        "light.z",
+        "light.a",
+    ]
 
 
 async def test_metadata_only_missing_reference_is_found(runtime):

@@ -17,6 +17,43 @@ Assistant onboarding, or call Amazon APIs.
 - A browser.
 - Free local port `8123`, or set `HA_PORT`.
 
+## Native Filters and Cleanup Acceptance — 2026-10-27
+
+The #59–#65 branch was exercised against disposable Home Assistant **2026.8.1**
+on port `18123`, using the production integration and rebuilt frontend. Normal
+onboarding and the integration config flow were completed; the managed includes
+were activated and Home Assistant's full configuration check passed.
+
+Headless Chromium/Playwright verified:
+
+- Edit all six native sections, preview exposure, and save the managed YAML.
+- **Use rules** removes an explicit entity exception while retaining domain rules.
+- Standalone duplicate and missing checks, combined findings, selected staging,
+  and shared Save produce the expected managed YAML.
+- Restore confirmation traps Tab and closes with Escape; confirmed restoration
+  restores the paired backup, including the previous duplicate/missing fixtures.
+- Desktop (`1440×1000`) and mobile (`390×844`) rule/Settings workflows; the mobile
+  panel had equal client/scroll width (`390px`) and no horizontal overflow.
+- No page JavaScript errors during the acceptance sequence.
+
+The browser run initially found an exposure control overlapping **Use rules**.
+The grid/action widths were corrected and the same unforced clicks then passed.
+The final acceptance run was repeated after all six independent-review fixes
+and the rebuilt production assets; the full HA configuration check passed again.
+
+Local evidence (ephemeral, not shipped):
+`/tmp/opencode/aem-browser/accept.cjs`, `rules-desktop.png`,
+`cleanup-desktop.png`, `rules-mobile.png`, and `settings-mobile.png`.
+Temporary authentication state is deliberately excluded from this repository.
+
+Limitations: no Amazon/AWS calls, real Alexa device discovery, or production
+configuration changes were made. This run covered HA `2026.8.1`, not every patch
+in the supported matrix. The desktop browser connection was unavailable, so
+headless Chromium supplied integrated browser acceptance. Automated backend and
+rendered frontend tests separately cover inventory races, selective cleanup,
+pending metadata/mode composition, read-only handling, stale previews, and
+save/restore editing locks.
+
 The harness refuses to start when the production integration manifest or
 `__init__.py` is missing.
 

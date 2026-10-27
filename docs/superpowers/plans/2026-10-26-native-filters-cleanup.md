@@ -41,48 +41,77 @@
 ## Execution checklist
 
 ### 1. #59 — Native filter editing and impact preview
-- [ ] Add failing transaction test: complete six-section draft plus metadata produces native exposure and round-trips patterns; preview does not write.
-- [ ] Implement optional `filter_config` in preview/save; validate via existing managed parser and native schema; apply entity edits against that draft, preserving rule lists.
-- [ ] Return draft filter, strategy and exposure from preview; runtime adds impact, default behavior and reasons using native semantics.
-- [ ] Add failing rendered-panel test for six editable sections, preview and staged save; implement shared rules draft and stale-preview invalidation.
-- [ ] Run focused backend/frontend tests and TypeScript checks; document and commit #59.
+- [x] Add failing transaction test: complete six-section draft plus metadata produces native exposure and round-trips patterns; preview does not write.
+- [x] Implement optional `filter_config` in preview/save; validate via existing managed parser and native schema; apply entity edits against that draft, preserving rule lists.
+- [x] Return draft filter, strategy and exposure from preview; runtime adds impact, default behavior and reasons using native semantics.
+- [x] Add failing rendered-panel test for six editable sections, preview and staged save; implement shared rules draft and stale-preview invalidation.
+- [x] Run focused backend/frontend tests and TypeScript checks; document and commit #59.
 
 ### 2. #60 — Reasons and Use rules
-- [ ] Test native reasons and removing both explicit exceptions without deleting metadata.
-- [ ] Implement `use_rules` entity update and backend draft reasons; expose action and current-draft reasons in panel.
-- [ ] Run focused tests/typechecking and commit #60.
+- [x] Test native reasons and removing both explicit exceptions without deleting metadata.
+- [x] Implement `use_rules` entity update and backend draft reasons; expose action and current-draft reasons in panel.
+- [x] Run focused tests/typechecking and commit #60.
 
 ### 3. #61 — Exact duplicate cleanup
-- [ ] Test duplicate findings with section/value/count, selective application, first-occurrence/order retention and no automatic deduplication.
-- [ ] Implement cleanup preview over the current draft and selectable Settings UI, staging resulting filter without writing.
-- [ ] Verify existing pending metadata/entity edits survive; run focused tests and commit #61.
+- [x] Test duplicate findings with section/value/count, selective application, first-occurrence/order retention and no automatic deduplication.
+- [x] Implement cleanup preview over the current draft and selectable Settings UI, staging resulting filter without writing.
+- [x] Verify existing pending metadata/entity edits survive; run focused tests and commit #61.
 
 ### 4. #62 — Missing-reference cleanup
-- [ ] Test registry/state inventory, disabled/unavailable/state-only cases, startup rejection, metadata-only references and reappearing entity at save.
-- [ ] Implement reliable inventory and revalidation callback in save lock; missing selections remove explicit entity references and metadata together only.
-- [ ] Implement selectable missing preview and safe per-row removal through the same workflow.
-- [ ] Run focused tests/typechecking and commit #62.
+- [x] Test registry/state inventory, disabled/unavailable/state-only cases, startup rejection, metadata-only references and reappearing entity at save.
+- [x] Implement reliable inventory and revalidation callback in save lock; missing selections remove explicit entity references and metadata together only.
+- [x] Implement selectable missing preview and safe per-row removal through the same workflow.
+- [x] Run focused tests/typechecking and commit #62.
 
 ### 5. #63 — Combined cleanup
-- [ ] Test combined/partial selections, overlap counted once, stale preview invalidation and preservation of pending edits.
-- [ ] Expose combined checks using shared findings/application, not a separate save route; no reset.
-- [ ] Run focused tests/typechecking and commit #63.
+- [x] Test combined/partial selections, overlap counted once, stale preview invalidation and preservation of pending edits.
+- [x] Expose combined checks using shared findings/application, not a separate save route; no reset.
+- [x] Run focused tests/typechecking and commit #63.
 
 ### 6. #64 — Recovery
-- [ ] Test unhealthy backups and pending-edit restore protection; verify backup failure cannot replace files.
-- [ ] Improve timestamp/health display, disable unhealthy restore, require explicit discard before restore, reload catalog and previews after restore.
-- [ ] Run focused tests and commit #64.
+- [x] Test unhealthy backups and pending-edit restore protection; verify backup failure cannot replace files.
+- [x] Improve timestamp/health display, disable unhealthy restore, require explicit discard before restore, reload catalog and previews after restore.
+- [x] Run focused tests and commit #64.
 
 ### 7. #65 — Integrated panel polish and verification
-- [ ] Consolidate Entities / Filter rules / Settings navigation, shared Save/Discard, accessible status and mobile layout.
-- [ ] Add rendered keyboard/navigation/error tests and acceptance checklist for all new flows.
-- [ ] Run full backend/frontend suites, lint, formatting, mypy, TypeScript/build and artifact checks.
-- [ ] Run disposable real Home Assistant acceptance/browser checks where environment permits; record limitations without claiming unrun checks passed.
-- [ ] Run code-review skill against the implementation, fix findings, rerun verification and commit final changes.
+- [x] Consolidate Entities / Filter rules / Settings navigation, shared Save/Discard, accessible status and mobile layout.
+- [x] Add rendered keyboard/navigation/error tests and acceptance checklist for all new flows.
+- [x] Run full backend/frontend suites, lint, formatting, mypy, TypeScript/build and artifact checks.
+- [x] Run disposable real Home Assistant acceptance/browser checks where environment permits; record limitations without claiming unrun checks passed.
+- [x] Run code-review skill against the implementation, fix findings, rerun verification and commit final changes.
 
 ## Progress
 
 - [x] Approved scope, constraints and dependency edges captured in seven published issues.
 - [x] Isolated worktree created; original generated frontend modifications left untouched.
 - [x] Frontend baseline: 26 tests passing.
-- [ ] Backend baseline: install pinned Home Assistant test dependencies (initial environment lacked them).
+- [x] Backend baseline: install pinned Home Assistant test dependencies (initial environment lacked them).
+
+## Final review record
+
+One fresh-context whole-branch review found six consequential issues. The final
+fix pass reproduced each with a failing regression and corrected explicit
+exception intent (including bulk after Use rules), authoritative reload after
+every save, editing locks during restore/save, pending mode/metadata conversion
+before Use rules, and lossless simple-list cleanup without `filter_config`.
+The final suite and acceptance evidence is recorded in `docs/ACCEPTANCE.md`.
+
+Rulings retained from execution:
+
+1. Published approved issues are the written specification; execute inline
+   without further approval stops, as requested. Cost if wrong: scope corrections
+   before merge.
+2. Recheck inventory under the serialized transaction before replacement and
+   after asynchronous validation; roll back if an entity reappears. This avoids
+   off-thread HA registry access. Cost if wrong: transient files during validation,
+   never a successful destructive cleanup.
+3. Retain recovery from an unhealthy/read-only current pair using a healthy
+   paired backup. Ordinary editing stays blocked; restore is the explicit
+   administrator recovery operation. Cost if wrong: the administrator replaces
+   current unsupported YAML when deliberately confirming recovery.
+4. Live acceptance covers disposable HA 2026.8.1 with headless Chromium, not
+   Amazon/AWS discovery or the complete HA patch matrix. Cost if wrong:
+   version/device-specific behavior requires further acceptance before release.
+
+No minor review findings were deferred. No push, PR, merge, release, or issue
+closure is part of this local implementation handoff.

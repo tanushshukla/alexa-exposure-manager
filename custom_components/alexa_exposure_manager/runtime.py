@@ -25,6 +25,7 @@ from .filter_rules import apply_duplicates, duplicate_findings, exposure_reason
 from .managed_files import (
     InvalidManagedConfigurationError,
     ManagedFileTransaction,
+    RevisionConflictError,
 )
 
 _SAFE_DEFAULT_FILTER = {
@@ -365,12 +366,27 @@ class AlexaExposureManagerRuntime:
             for entity in catalog["entities"]
             if not entity["missing"]
         }
+        filter_config = message.get("filter_config")
+        if (
+            "cleanup_checks" in message
+            and filter_config is None
+            and message["expose_new_entities"] == catalog["expose_new_entities"]
+        ):
+            # Cleanup must see the saved lists, not the simple-mode set renderer.
+            # A deliberate mode conversion still uses the ordinary preview path.
+            filter_config = catalog["filter"]
         preview = await self.transaction.async_preview(
             expose_new_entities=message["expose_new_entities"],
             entities=message.get("entities", []),
             known_entity_ids=known_ids,
-            filter_config=message.get("filter_config"),
+            filter_config=filter_config,
         )
+        for key in ("revision", "entities_revision"):
+            expected = message.get(f"expected_{key}", catalog[key])
+            if preview[key] != expected or preview[key] != catalog[key]:
+                raise RevisionConflictError(
+                    "Managed files changed; reload before previewing"
+                )
         if "cleanup_checks" in message:
             findings = (
                 duplicate_findings(preview["filter"])

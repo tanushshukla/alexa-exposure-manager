@@ -4,7 +4,8 @@ This guide covers installation, activation, migration, daily entity management,
 safe saving, recovery, privacy, and troubleshooting for Alexa Exposure Manager.
 
 GitHub issue [#12](https://github.com/tanushshukla/alexa-exposure-manager/issues/12)
-is the canonical v1 specification.
+is the canonical v1 specification. Native filters, cleanup and Settings recovery
+are the approved post-v1 extension in issues #59–#65.
 
 ## Before You Begin
 
@@ -200,9 +201,9 @@ preserved exactly, but the panel does not allow exposing an entity Alexa cannot
 control. Configured entity IDs that Home Assistant no longer knows are retained
 and stay visible until you remove them explicitly.
 
-After migration, domain and glob rule editing is not available in v1. The panel
-labels these filters as **Rule-based** and stores entity exposure changes as
-explicit include/exclude exceptions without removing the domain or glob rules.
+After migration, edit domains and globs in **Filter rules**. The panel labels
+these filters as **Rule-based** and stores entity exposure changes as explicit
+include/exclude exceptions without removing the domain or glob rules.
 Keep the old configuration backup until you have checked Alexa discovery and
 control.
 
@@ -281,7 +282,8 @@ On save, the integration:
 
 1. Verifies the expected revision of both managed files.
 2. Rejects the save if either file changed since the page loaded.
-3. Generates deterministic, sorted YAML.
+3. Generates deterministic YAML, preserving native rule order and duplicates
+   unless you explicitly stage their cleanup.
 4. Creates a timestamped backup of both managed files.
 5. Retains the five most recent backup versions.
 6. Writes and flushes a temporary file for each managed file, then atomically
@@ -314,9 +316,57 @@ Alexa Exposure Manager does not call Amazon APIs and cannot force discovery.
 Renamed or removed devices can sometimes remain in the Alexa app; remove stale
 Alexa devices there and discover again if needed.
 
-## Advanced Recovery
+## Native Filter Rules and Exceptions
 
-Open the collapsed **Advanced** section only when auditing or recovering.
+Use **Entities**, **Filter rules**, and **Settings** to move between workflows.
+They share one pending draft: navigation does not save or discard it. Use
+**Discard changes** to abandon the entire draft.
+
+**Filter rules** edits all six native sections: included/excluded entities,
+domains, and glob patterns. Enter one value per line. Globs such as
+`light.kitchen_*` are shell-style patterns, not regular expressions. The manager
+uses Home Assistant's native precedence rather than treating exclusions as
+unconditionally stronger than inclusions. An explicit include can override a
+domain or glob exclusion.
+
+Select **Preview exposure changes** to review newly exposed/hidden entities and
+future-entity behavior before saving. Changing the draft invalidates the preview;
+preview it again before Save. Removing all include and exclude rules restores
+Alexa's registry-default behavior, not a deny-all list. The simple **Expose new
+entities automatically** switch is not a replacement for native rule editing.
+
+Entity rows explain whether exposure comes from an explicit exception, a domain,
+a glob, or the default. **Use rules** removes that entity from both explicit
+entity lists without deleting its Alexa metadata; the remaining native rules
+then decide exposure. Broad rules do not make an unsupported entity compatible
+with Alexa.
+
+## Cleanup
+
+Open **Settings → Cleanup** and select **Check duplicate rules**, **Check missing
+references**, or **Run all cleanup checks**. Nothing is removed by running checks.
+Select individual findings and choose **Stage selected cleanup**, then review the
+exposure preview and **Save changes**, or **Discard changes** to cancel.
+
+- Duplicate cleanup removes extra identical values within a single section,
+  keeping the first occurrence and order. Overlapping rules are not duplicates.
+- Missing cleanup removes selected explicit entity references and their metadata
+  together. An entity is missing only when absent from both the entity registry
+  and current states. Disabled, unavailable, registered-only and state-only
+  entities are retained. Domains and globs are not removed for matching nothing.
+- Combined results count each affected entity once, even if several findings
+  concern it. Unselected findings remain unchanged.
+- Checks become stale when you edit the draft; run them again. Missing cleanup
+  is blocked during startup/unreliable inventory and rechecked during Save. If
+  an entity reappears, cleanup is rejected or rolled back; review and rerun checks.
+
+Cleanup changes only the two managed files. It never deletes Home Assistant or
+Amazon devices, resets configuration, or rewrites your containing Alexa YAML.
+
+## Recovery
+
+Open **Settings → Recovery and diagnostics**. The collapsed **Advanced tools**
+section also remains available from the entity/rule workflows.
 
 It provides:
 
@@ -332,6 +382,12 @@ It provides:
 Restoring a backup creates a new backup first and uses the same revision,
 atomic-write, validation, rollback, and restart-required protections as a normal
 save.
+
+Backup entries show local timestamps and pair health. Incomplete or unreadable
+pairs cannot be selected. Save or explicitly Discard all pending edits before
+restoring; restore never silently discards them. Confirm the selected backup,
+then review the reloaded catalog and restart-required state. Retain a full Home
+Assistant backup for recovery when the panel itself is unavailable.
 
 ### Read-Only Safety Mode
 

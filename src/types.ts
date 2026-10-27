@@ -142,6 +142,7 @@ export interface AlexaEntity {
 }
 
 export interface EntityDraft {
+  exposureChanged?: boolean;
   useRules?: boolean;
   exposed: boolean;
   name: string;

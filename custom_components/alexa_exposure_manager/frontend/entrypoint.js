@@ -29,11 +29,11 @@ var e = globalThis, t = e.ShadowRoot && (e.ShadyCSS === void 0 || e.ShadyCSS.nat
 	let t = "";
 	for (let n of e.cssRules) t += n.cssText;
 	return a(t);
-})(e) : e, { is: l, defineProperty: u, getOwnPropertyDescriptor: d, getOwnPropertyNames: ee, getOwnPropertySymbols: te, getPrototypeOf: ne } = Object, f = globalThis, p = f.trustedTypes, re = p ? p.emptyScript : "", m = f.reactiveElementPolyfillSupport, h = (e, t) => e, g = {
+})(e) : e, { is: l, defineProperty: u, getOwnPropertyDescriptor: d, getOwnPropertyNames: ee, getOwnPropertySymbols: f, getPrototypeOf: te } = Object, p = globalThis, m = p.trustedTypes, ne = m ? m.emptyScript : "", re = p.reactiveElementPolyfillSupport, h = (e, t) => e, g = {
 	toAttribute(e, t) {
 		switch (t) {
 			case Boolean:
-				e = e ? re : null;
+				e = e ? ne : null;
 				break;
 			case Object:
 			case Array: e = e == null ? e : JSON.stringify(e);
@@ -66,7 +66,7 @@ var e = globalThis, t = e.ShadowRoot && (e.ShadyCSS === void 0 || e.ShadyCSS.nat
 	useDefault: !1,
 	hasChanged: _
 };
-Symbol.metadata ??= Symbol("metadata"), f.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
+Symbol.metadata ??= Symbol("metadata"), p.litPropertyMetadata ??= /* @__PURE__ */ new WeakMap();
 var y = class extends HTMLElement {
 	static addInitializer(e) {
 		this._$Ei(), (this.l ??= []).push(e);
@@ -104,13 +104,13 @@ var y = class extends HTMLElement {
 	}
 	static _$Ei() {
 		if (this.hasOwnProperty(h("elementProperties"))) return;
-		let e = ne(this);
+		let e = te(this);
 		e.finalize(), e.l !== void 0 && (this.l = [...e.l]), this.elementProperties = new Map(e.elementProperties);
 	}
 	static finalize() {
 		if (this.hasOwnProperty(h("finalized"))) return;
 		if (this.finalized = !0, this._$Ei(), this.hasOwnProperty(h("properties"))) {
-			let e = this.properties, t = [...ee(e), ...te(e)];
+			let e = this.properties, t = [...ee(e), ...f(e)];
 			for (let n of t) this.createProperty(n, e[n]);
 		}
 		let e = this[Symbol.metadata];
@@ -251,37 +251,37 @@ var y = class extends HTMLElement {
 	updated(e) {}
 	firstUpdated(e) {}
 };
-y.elementStyles = [], y.shadowRootOptions = { mode: "open" }, y[h("elementProperties")] = /* @__PURE__ */ new Map(), y[h("finalized")] = /* @__PURE__ */ new Map(), m?.({ ReactiveElement: y }), (f.reactiveElementVersions ??= []).push("2.1.2");
+y.elementStyles = [], y.shadowRootOptions = { mode: "open" }, y[h("elementProperties")] = /* @__PURE__ */ new Map(), y[h("finalized")] = /* @__PURE__ */ new Map(), re?.({ ReactiveElement: y }), (p.reactiveElementVersions ??= []).push("2.1.2");
 //#endregion
 //#region node_modules/lit-html/lit-html.js
-var b = globalThis, x = (e) => e, S = b.trustedTypes, C = S ? S.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, w = "$lit$", T = `lit$${Math.random().toFixed(9).slice(2)}$`, E = "?" + T, D = `<${E}>`, O = document, k = () => O.createComment(""), A = (e) => e === null || typeof e != "object" && typeof e != "function", j = Array.isArray, ie = (e) => j(e) || typeof e?.[Symbol.iterator] == "function", M = "[ 	\n\f\r]", N = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, P = /-->/g, F = />/g, I = RegExp(`>|${M}(?:([^\\s"'>=/]+)(${M}*=${M}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`, "g"), L = /'/g, R = /"/g, z = /^(?:script|style|textarea|title)$/i, B = ((e) => (t, ...n) => ({
+var b = globalThis, x = (e) => e, S = b.trustedTypes, C = S ? S.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, w = "$lit$", T = `lit$${Math.random().toFixed(9).slice(2)}$`, E = "?" + T, ie = `<${E}>`, D = document, O = () => D.createComment(""), k = (e) => e === null || typeof e != "object" && typeof e != "function", A = Array.isArray, ae = (e) => A(e) || typeof e?.[Symbol.iterator] == "function", j = "[ 	\n\f\r]", M = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, N = /-->/g, P = />/g, F = RegExp(`>|${j}(?:([^\\s"'>=/]+)(${j}*=${j}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`, "g"), I = /'/g, L = /"/g, R = /^(?:script|style|textarea|title)$/i, z = ((e) => (t, ...n) => ({
 	_$litType$: e,
 	strings: t,
 	values: n
-}))(1), V = Symbol.for("lit-noChange"), H = Symbol.for("lit-nothing"), U = /* @__PURE__ */ new WeakMap(), W = O.createTreeWalker(O, 129);
-function G(e, t) {
-	if (!j(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
+}))(1), B = Symbol.for("lit-noChange"), V = Symbol.for("lit-nothing"), H = /* @__PURE__ */ new WeakMap(), U = D.createTreeWalker(D, 129);
+function W(e, t) {
+	if (!A(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
 	return C === void 0 ? t : C.createHTML(t);
 }
-var ae = (e, t) => {
-	let n = e.length - 1, r = [], i, a = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", o = N;
+var oe = (e, t) => {
+	let n = e.length - 1, r = [], i, a = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", o = M;
 	for (let t = 0; t < n; t++) {
 		let n = e[t], s, c, l = -1, u = 0;
-		for (; u < n.length && (o.lastIndex = u, c = o.exec(n), c !== null);) u = o.lastIndex, o === N ? c[1] === "!--" ? o = P : c[1] === void 0 ? c[2] === void 0 ? c[3] !== void 0 && (o = I) : (z.test(c[2]) && (i = RegExp("</" + c[2], "g")), o = I) : o = F : o === I ? c[0] === ">" ? (o = i ?? N, l = -1) : c[1] === void 0 ? l = -2 : (l = o.lastIndex - c[2].length, s = c[1], o = c[3] === void 0 ? I : c[3] === "\"" ? R : L) : o === R || o === L ? o = I : o === P || o === F ? o = N : (o = I, i = void 0);
-		let d = o === I && e[t + 1].startsWith("/>") ? " " : "";
-		a += o === N ? n + D : l >= 0 ? (r.push(s), n.slice(0, l) + w + n.slice(l) + T + d) : n + T + (l === -2 ? t : d);
+		for (; u < n.length && (o.lastIndex = u, c = o.exec(n), c !== null);) u = o.lastIndex, o === M ? c[1] === "!--" ? o = N : c[1] === void 0 ? c[2] === void 0 ? c[3] !== void 0 && (o = F) : (R.test(c[2]) && (i = RegExp("</" + c[2], "g")), o = F) : o = P : o === F ? c[0] === ">" ? (o = i ?? M, l = -1) : c[1] === void 0 ? l = -2 : (l = o.lastIndex - c[2].length, s = c[1], o = c[3] === void 0 ? F : c[3] === "\"" ? L : I) : o === L || o === I ? o = F : o === N || o === P ? o = M : (o = F, i = void 0);
+		let d = o === F && e[t + 1].startsWith("/>") ? " " : "";
+		a += o === M ? n + ie : l >= 0 ? (r.push(s), n.slice(0, l) + w + n.slice(l) + T + d) : n + T + (l === -2 ? t : d);
 	}
-	return [G(e, a + (e[n] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), r];
-}, K = class e {
+	return [W(e, a + (e[n] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), r];
+}, G = class e {
 	constructor({ strings: t, _$litType$: n }, r) {
 		let i;
 		this.parts = [];
-		let a = 0, o = 0, s = t.length - 1, c = this.parts, [l, u] = ae(t, n);
-		if (this.el = e.createElement(l, r), W.currentNode = this.el.content, n === 2 || n === 3) {
+		let a = 0, o = 0, s = t.length - 1, c = this.parts, [l, u] = oe(t, n);
+		if (this.el = e.createElement(l, r), U.currentNode = this.el.content, n === 2 || n === 3) {
 			let e = this.el.content.firstChild;
 			e.replaceWith(...e.childNodes);
 		}
-		for (; (i = W.nextNode()) !== null && c.length < s;) {
+		for (; (i = U.nextNode()) !== null && c.length < s;) {
 			if (i.nodeType === 1) {
 				if (i.hasAttributes()) for (let e of i.getAttributeNames()) if (e.endsWith(w)) {
 					let t = u[o++], n = i.getAttribute(e).split(T), r = /([.?@])?(.*)/.exec(t);
@@ -296,15 +296,15 @@ var ae = (e, t) => {
 					type: 6,
 					index: a
 				}), i.removeAttribute(e));
-				if (z.test(i.tagName)) {
+				if (R.test(i.tagName)) {
 					let e = i.textContent.split(T), t = e.length - 1;
 					if (t > 0) {
 						i.textContent = S ? S.emptyScript : "";
-						for (let n = 0; n < t; n++) i.append(e[n], k()), W.nextNode(), c.push({
+						for (let n = 0; n < t; n++) i.append(e[n], O()), U.nextNode(), c.push({
 							type: 2,
 							index: ++a
 						});
-						i.append(e[t], k());
+						i.append(e[t], O());
 					}
 				}
 			} else if (i.nodeType === 8) {
@@ -324,16 +324,16 @@ var ae = (e, t) => {
 		}
 	}
 	static createElement(e, t) {
-		let n = O.createElement("template");
+		let n = D.createElement("template");
 		return n.innerHTML = e, n;
 	}
 };
-function q(e, t, n = e, r) {
-	if (t === V) return t;
-	let i = r === void 0 ? n._$Cl : n._$Co?.[r], a = A(t) ? void 0 : t._$litDirective$;
-	return i?.constructor !== a && (i?._$AO?.(!1), a === void 0 ? i = void 0 : (i = new a(e), i._$AT(e, n, r)), r === void 0 ? n._$Cl = i : (n._$Co ??= [])[r] = i), i !== void 0 && (t = q(e, i._$AS(e, t.values), i, r)), t;
+function K(e, t, n = e, r) {
+	if (t === B) return t;
+	let i = r === void 0 ? n._$Cl : n._$Co?.[r], a = k(t) ? void 0 : t._$litDirective$;
+	return i?.constructor !== a && (i?._$AO?.(!1), a === void 0 ? i = void 0 : (i = new a(e), i._$AT(e, n, r)), r === void 0 ? n._$Cl = i : (n._$Co ??= [])[r] = i), i !== void 0 && (t = K(e, i._$AS(e, t.values), i, r)), t;
 }
-var oe = class {
+var q = class {
 	constructor(e, t) {
 		this._$AV = [], this._$AN = void 0, this._$AD = e, this._$AM = t;
 	}
@@ -344,17 +344,17 @@ var oe = class {
 		return this._$AM._$AU;
 	}
 	u(e) {
-		let { el: { content: t }, parts: n } = this._$AD, r = (e?.creationScope ?? O).importNode(t, !0);
-		W.currentNode = r;
-		let i = W.nextNode(), a = 0, o = 0, s = n[0];
+		let { el: { content: t }, parts: n } = this._$AD, r = (e?.creationScope ?? D).importNode(t, !0);
+		U.currentNode = r;
+		let i = U.nextNode(), a = 0, o = 0, s = n[0];
 		for (; s !== void 0;) {
 			if (a === s.index) {
 				let t;
 				s.type === 2 ? t = new J(i, i.nextSibling, this, e) : s.type === 1 ? t = new s.ctor(i, s.name, s.strings, this, e) : s.type === 6 && (t = new ue(i, this, e)), this._$AV.push(t), s = n[++o];
 			}
-			a !== s?.index && (i = W.nextNode(), a++);
+			a !== s?.index && (i = U.nextNode(), a++);
 		}
-		return W.currentNode = O, r;
+		return U.currentNode = D, r;
 	}
 	p(e) {
 		let t = 0;
@@ -365,7 +365,7 @@ var oe = class {
 		return this._$AM?._$AU ?? this._$Cv;
 	}
 	constructor(e, t, n, r) {
-		this.type = 2, this._$AH = H, this._$AN = void 0, this._$AA = e, this._$AB = t, this._$AM = n, this.options = r, this._$Cv = r?.isConnected ?? !0;
+		this.type = 2, this._$AH = V, this._$AN = void 0, this._$AA = e, this._$AB = t, this._$AM = n, this.options = r, this._$Cv = r?.isConnected ?? !0;
 	}
 	get parentNode() {
 		let e = this._$AA.parentNode, t = this._$AM;
@@ -378,7 +378,7 @@ var oe = class {
 		return this._$AB;
 	}
 	_$AI(e, t = this) {
-		e = q(this, e, t), A(e) ? e === H || e == null || e === "" ? (this._$AH !== H && this._$AR(), this._$AH = H) : e !== this._$AH && e !== V && this._(e) : e._$litType$ === void 0 ? e.nodeType === void 0 ? ie(e) ? this.k(e) : this._(e) : this.T(e) : this.$(e);
+		e = K(this, e, t), k(e) ? e === V || e == null || e === "" ? (this._$AH !== V && this._$AR(), this._$AH = V) : e !== this._$AH && e !== B && this._(e) : e._$litType$ === void 0 ? e.nodeType === void 0 ? ae(e) ? this.k(e) : this._(e) : this.T(e) : this.$(e);
 	}
 	O(e) {
 		return this._$AA.parentNode.insertBefore(e, this._$AB);
@@ -387,24 +387,24 @@ var oe = class {
 		this._$AH !== e && (this._$AR(), this._$AH = this.O(e));
 	}
 	_(e) {
-		this._$AH !== H && A(this._$AH) ? this._$AA.nextSibling.data = e : this.T(O.createTextNode(e)), this._$AH = e;
+		this._$AH !== V && k(this._$AH) ? this._$AA.nextSibling.data = e : this.T(D.createTextNode(e)), this._$AH = e;
 	}
 	$(e) {
-		let { values: t, _$litType$: n } = e, r = typeof n == "number" ? this._$AC(e) : (n.el === void 0 && (n.el = K.createElement(G(n.h, n.h[0]), this.options)), n);
+		let { values: t, _$litType$: n } = e, r = typeof n == "number" ? this._$AC(e) : (n.el === void 0 && (n.el = G.createElement(W(n.h, n.h[0]), this.options)), n);
 		if (this._$AH?._$AD === r) this._$AH.p(t);
 		else {
-			let e = new oe(r, this), n = e.u(this.options);
+			let e = new q(r, this), n = e.u(this.options);
 			e.p(t), this.T(n), this._$AH = e;
 		}
 	}
 	_$AC(e) {
-		let t = U.get(e.strings);
-		return t === void 0 && U.set(e.strings, t = new K(e)), t;
+		let t = H.get(e.strings);
+		return t === void 0 && H.set(e.strings, t = new G(e)), t;
 	}
 	k(t) {
-		j(this._$AH) || (this._$AH = [], this._$AR());
+		A(this._$AH) || (this._$AH = [], this._$AR());
 		let n = this._$AH, r, i = 0;
-		for (let a of t) i === n.length ? n.push(r = new e(this.O(k()), this.O(k()), this, this.options)) : r = n[i], r._$AI(a), i++;
+		for (let a of t) i === n.length ? n.push(r = new e(this.O(O()), this.O(O()), this, this.options)) : r = n[i], r._$AI(a), i++;
 		i < n.length && (this._$AR(r && r._$AB.nextSibling, i), n.length = i);
 	}
 	_$AR(e = this._$AA.nextSibling, t) {
@@ -424,41 +424,41 @@ var oe = class {
 		return this._$AM._$AU;
 	}
 	constructor(e, t, n, r, i) {
-		this.type = 1, this._$AH = H, this._$AN = void 0, this.element = e, this.name = t, this._$AM = r, this.options = i, n.length > 2 || n[0] !== "" || n[1] !== "" ? (this._$AH = Array(n.length - 1).fill(/* @__PURE__ */ new String()), this.strings = n) : this._$AH = H;
+		this.type = 1, this._$AH = V, this._$AN = void 0, this.element = e, this.name = t, this._$AM = r, this.options = i, n.length > 2 || n[0] !== "" || n[1] !== "" ? (this._$AH = Array(n.length - 1).fill(/* @__PURE__ */ new String()), this.strings = n) : this._$AH = V;
 	}
 	_$AI(e, t = this, n, r) {
 		let i = this.strings, a = !1;
-		if (i === void 0) e = q(this, e, t, 0), a = !A(e) || e !== this._$AH && e !== V, a && (this._$AH = e);
+		if (i === void 0) e = K(this, e, t, 0), a = !k(e) || e !== this._$AH && e !== B, a && (this._$AH = e);
 		else {
 			let r = e, o, s;
-			for (e = i[0], o = 0; o < i.length - 1; o++) s = q(this, r[n + o], t, o), s === V && (s = this._$AH[o]), a ||= !A(s) || s !== this._$AH[o], s === H ? e = H : e !== H && (e += (s ?? "") + i[o + 1]), this._$AH[o] = s;
+			for (e = i[0], o = 0; o < i.length - 1; o++) s = K(this, r[n + o], t, o), s === B && (s = this._$AH[o]), a ||= !k(s) || s !== this._$AH[o], s === V ? e = V : e !== V && (e += (s ?? "") + i[o + 1]), this._$AH[o] = s;
 		}
 		a && !r && this.j(e);
 	}
 	j(e) {
-		e === H ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
+		e === V ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, e ?? "");
 	}
 }, se = class extends Y {
 	constructor() {
 		super(...arguments), this.type = 3;
 	}
 	j(e) {
-		this.element[this.name] = e === H ? void 0 : e;
+		this.element[this.name] = e === V ? void 0 : e;
 	}
 }, ce = class extends Y {
 	constructor() {
 		super(...arguments), this.type = 4;
 	}
 	j(e) {
-		this.element.toggleAttribute(this.name, !!e && e !== H);
+		this.element.toggleAttribute(this.name, !!e && e !== V);
 	}
 }, le = class extends Y {
 	constructor(e, t, n, r, i) {
 		super(e, t, n, r, i), this.type = 5;
 	}
 	_$AI(e, t = this) {
-		if ((e = q(this, e, t, 0) ?? H) === V) return;
-		let n = this._$AH, r = e === H && n !== H || e.capture !== n.capture || e.once !== n.once || e.passive !== n.passive, i = e !== H && (n === H || r);
+		if ((e = K(this, e, t, 0) ?? V) === B) return;
+		let n = this._$AH, r = e === V && n !== V || e.capture !== n.capture || e.once !== n.once || e.passive !== n.passive, i = e !== V && (n === V || r);
 		r && this.element.removeEventListener(this.name, this, n), i && this.element.addEventListener(this.name, this, e), this._$AH = e;
 	}
 	handleEvent(e) {
@@ -472,15 +472,15 @@ var oe = class {
 		return this._$AM._$AU;
 	}
 	_$AI(e) {
-		q(this, e);
+		K(this, e);
 	}
 }, de = b.litHtmlPolyfillSupport;
-de?.(K, J), (b.litHtmlVersions ??= []).push("3.3.3");
+de?.(G, J), (b.litHtmlVersions ??= []).push("3.3.3");
 var fe = (e, t, n) => {
 	let r = n?.renderBefore ?? t, i = r._$litPart$;
 	if (i === void 0) {
 		let e = n?.renderBefore ?? null;
-		r._$litPart$ = i = new J(t.insertBefore(k(), e), e, void 0, n ?? {});
+		r._$litPart$ = i = new J(t.insertBefore(O(), e), e, void 0, n ?? {});
 	}
 	return i._$AI(e), i;
 }, X = globalThis, Z = class extends y {
@@ -502,7 +502,7 @@ var fe = (e, t, n) => {
 		super.disconnectedCallback(), this._$Do?.setConnected(!1);
 	}
 	render() {
-		return V;
+		return B;
 	}
 };
 Z._$litElement$ = !0, Z.finalized = !0, X.litElementHydrateSupport?.({ LitElement: Z });
@@ -700,8 +700,15 @@ function Q(e, t = {}) {
 	return Object.entries(t).reduce((e, [t, n]) => e.replaceAll(`{${t}}`, String(n)), he[e]);
 }
 //#endregion
-//#region src/alexa-exposure-manager-panel.ts
-var $ = class e extends Z {
+//#region src/filter-rules.ts
+var ge = [
+	["include_entities", "Included entities"],
+	["exclude_entities", "Excluded entities"],
+	["include_domains", "Included domains"],
+	["exclude_domains", "Excluded domains"],
+	["include_entity_globs", "Included glob patterns"],
+	["exclude_entity_globs", "Excluded glob patterns"]
+], $ = class e extends Z {
 	static properties = {
 		hass: { attribute: !1 },
 		narrow: { type: Boolean },
@@ -739,17 +746,30 @@ var $ = class e extends Z {
 		migrationError: { state: !0 },
 		validationIssues: { state: !0 },
 		restartBannerDismissed: { state: !0 },
-		candidateWindowStart: { state: !0 }
+		candidateWindowStart: { state: !0 },
+		section: { state: !0 },
+		rulesDraft: { state: !0 },
+		draftPreview: { state: !0 },
+		previewLoading: { state: !0 },
+		cleanupFindings: { state: !0 },
+		cleanupSelection: { state: !0 },
+		cleanupBusy: { state: !0 },
+		cleanupNotice: { state: !0 }
 	};
 	baseExposeNewEntities = !1;
+	previewFingerprint = "";
+	previewSequence = 0;
+	cleanupFingerprint = "";
+	cleanupChecks = [];
+	cleanupMissing = [];
 	dialogTrigger;
 	loadedConnection;
 	static CANDIDATE_WINDOW = 40;
 	constructor() {
-		super(), this.narrow = !1, this.loading = !0, this.error = "", this.query = "", this.staged = {}, this.saving = !1, this.saveError = "", this.exposeNewEntities = !1, this.addDialogOpen = !1, this.addQuery = "", this.addSelection = [], this.selectedEntities = [], this.bulkConfirmOpen = !1, this.bulkAction = "unexpose", this.visibility = "all", this.advancedOpen = !1, this.advancedLoading = !1, this.advancedError = "", this.operationMessage = "", this.migrationLoading = !1, this.migrationError = "", this.validationIssues = [], this.restartBannerDismissed = !1, this.candidateWindowStart = 0;
+		super(), this.narrow = !1, this.loading = !0, this.error = "", this.query = "", this.staged = {}, this.saving = !1, this.saveError = "", this.exposeNewEntities = !1, this.addDialogOpen = !1, this.addQuery = "", this.addSelection = [], this.selectedEntities = [], this.bulkConfirmOpen = !1, this.bulkAction = "unexpose", this.visibility = "all", this.advancedOpen = !1, this.advancedLoading = !1, this.advancedError = "", this.operationMessage = "", this.migrationLoading = !1, this.migrationError = "", this.validationIssues = [], this.restartBannerDismissed = !1, this.candidateWindowStart = 0, this.section = "entities", this.previewLoading = !1, this.cleanupSelection = [], this.cleanupBusy = !1, this.cleanupNotice = "";
 	}
 	updated(e) {
-		if (e.has("hass") && this.hass && this.hass.connection !== this.loadedConnection && (this.loadedConnection = this.hass.connection, this.load()), e.has("confirmation") && this.confirmation || e.has("bulkConfirmOpen") && this.bulkConfirmOpen) {
+		if ((e.has("staged") || e.has("rulesDraft") || e.has("exposeNewEntities")) && (this.draftPreview = void 0, this.previewFingerprint = "", this.previewSequence++, this.previewResponse = void 0), e.has("hass") && this.hass && this.hass.connection !== this.loadedConnection && (this.loadedConnection = this.hass.connection, this.load()), e.has("confirmation") && this.confirmation || e.has("bulkConfirmOpen") && this.bulkConfirmOpen) {
 			let e = this.renderRoot.activeElement;
 			e instanceof HTMLElement && (this.dialogTrigger = e), queueMicrotask(() => {
 				this.renderRoot.querySelector("[role='alertdialog'] footer button:last-child")?.focus();
@@ -771,20 +791,20 @@ var $ = class e extends Z {
 		}
 	}
 	render() {
-		return B`
+		return z`
       <main class=${this.narrow ? "narrow" : ""}>
-        ${this.loading ? B`<section class="state" role="status"><div class="spinner"></div>${Q("loading")}</section>` : H}
-        ${!this.loading && this.error ? B`<section class="state error" role="alert">
+        ${this.loading ? z`<section class="state" role="status"><div class="spinner"></div>${Q("loading")}</section>` : V}
+        ${!this.loading && this.error ? z`<section class="state error" role="alert">
               <h1>${Q("loadErrorTitle")}</h1>
               <p>${this.error}</p>
               <button type="button" @click=${this.load}>${Q("retry")}</button>
-            </section>` : H}
-        ${!this.loading && !this.error && !this.isConfigured() ? this.renderSetup() : H}
-        ${!this.loading && !this.error && this.isConfigured() ? this.renderManager() : H}
-        ${this.addDialogOpen ? this.renderAddDialog() : H}
-        ${this.bulkConfirmOpen ? this.renderBulkConfirmation() : H}
-        ${this.metadataEntityId && this.metadataDraft ? this.renderMetadataDialog() : H}
-        ${this.confirmation ? this.renderOperationConfirmation() : H}
+            </section>` : V}
+        ${!this.loading && !this.error && !this.isConfigured() ? this.renderSetup() : V}
+        ${!this.loading && !this.error && this.isConfigured() ? this.renderManager() : V}
+        ${this.addDialogOpen ? this.renderAddDialog() : V}
+        ${this.bulkConfirmOpen ? this.renderBulkConfirmation() : V}
+        ${this.metadataEntityId && this.metadataDraft ? this.renderMetadataDialog() : V}
+        ${this.confirmation ? this.renderOperationConfirmation() : V}
       </main>
     `;
 	}
@@ -796,29 +816,29 @@ var $ = class e extends Z {
 	}
 	renderSetup() {
 		let e = this.status?.managed_files?.safe_defaults === !0 && this.status?.migration_available === !0;
-		return B`
+		return z`
       <section class="setup">
         <span class="eyebrow">${Q(e ? "recoveryEyebrow" : "setupEyebrow")}</span>
         <h1>${Q(e ? "recoveryTitle" : "setupTitle")}</h1>
         <p>${Q(e ? "recoveryBody" : "setupBody")}</p>
-        ${e ? B`<ol class="recovery-steps">
+        ${e ? z`<ol class="recovery-steps">
               <li>${Q("recoveryKeepInline")}</li>
               <li>${Q("recoveryPreview")}</li>
               <li>${Q("recoveryImport")}</li>
               <li>${Q("recoveryReplace")}</li>
               <li>${Q("recoveryRestart")}</li>
               <li>${Q("recoveryDiscover")}</li>
-            </ol>` : H}
+            </ol>` : V}
         <strong class="setup-label">${Q("setupConfigurationLabel")}</strong>
         <pre><code>${Q("setupConfigurationInclude")}</code></pre>
         <strong class="setup-label">${Q("setupAlexaLabel")}</strong>
         <pre><code>${Q("setupSmartHome")}\n  ${Q("setupFilter")}\n  ${Q("setupEntityConfig")}</code></pre>
         <p class="safety">${Q("setupSafety")}</p>
-        ${this.status?.migration_available === !1 ? B`<div class="setup-source-note">
+        ${this.status?.migration_available === !1 ? z`<div class="setup-source-note">
               <strong>${Q("migrationMissingTitle")}</strong>
               <span>${Q("migrationMissingSetupBody")}</span>
-            </div>` : H}
-        ${this.status?.migration_available === !1 ? H : B`<div class="migration">
+            </div>` : V}
+        ${this.status?.migration_available === !1 ? V : z`<div class="migration">
               <p>${Q("migrationBody")}</p>
               ${this.renderMigrationActions()}
             </div>`}
@@ -826,29 +846,29 @@ var $ = class e extends Z {
     `;
 	}
 	renderMigrationActions() {
-		return B`
+		return z`
       <button type="button" aria-label=${Q("migrationPreview")} ?disabled=${this.migrationLoading} @click=${this.previewMigration}>${Q("migrationPreview")}</button>
-      ${this.migrationPreviewResponse ? B`<div class="migration-result" role="status">
+      ${this.migrationPreviewResponse ? z`<div class="migration-result" role="status">
             <div>
               <span>${this.migrationSummary()}</span>
               <span class="migration-inventory">${this.migrationInventory()}</span>
               <span class="migration-source">${this.migrationSource()}</span>
             </div>
-            ${typeof this.migrationPreviewResponse.token == "string" ? B`<button class="secondary" type="button" aria-label=${Q("migrationImport")} @click=${() => {
+            ${typeof this.migrationPreviewResponse.token == "string" ? z`<button class="secondary" type="button" aria-label=${Q("migrationImport")} @click=${() => {
 			this.confirmation = "migration";
-		}}>${Q("migrationImport")}</button>` : H}
-          </div>` : H}
-      ${this.migrationError ? B`<p class="migration-error" role="alert">${this.migrationError}</p>` : H}
+		}}>${Q("migrationImport")}</button>` : V}
+          </div>` : V}
+      ${this.migrationError ? z`<p class="migration-error" role="alert">${this.migrationError}</p>` : V}
     `;
 	}
 	renderConfiguredMigration() {
-		return this.status?.migration_state === "complete" ? H : this.status?.migration_available ? B`<section class="migration-notice">
+		return this.status?.migration_state === "complete" ? V : this.status?.migration_available ? z`<section class="migration-notice">
         <div>
           <strong>${Q("migrationReadyTitle")}</strong>
           <span>${Q("migrationReadyBody")}</span>
         </div>
         ${this.renderMigrationActions()}
-      </section>` : B`<section class="migration-notice missing-source">
+      </section>` : z`<section class="migration-notice missing-source">
       <div>
         <strong>${Q("migrationMissingTitle")}</strong>
         <span>${Q("migrationMissingBody")}</span>
@@ -865,7 +885,7 @@ var $ = class e extends Z {
 			].join(" ").toLocaleLowerCase().includes(t), i = this.visibility === "all" || this.visibility === "exposed" && n || this.visibility === "hidden" && !n || this.visibility === "unsupported" && !e.supported || this.visibility === "missing" && e.missing;
 			return r && i;
 		});
-		return B`
+		return z`
       <div class="manager">
         <header class="page-header">
           <div>
@@ -874,7 +894,7 @@ var $ = class e extends Z {
             <p>${Q("entitiesBody")}</p>
           </div>
           <div class="save-group">
-            ${this.pendingCount ? B`<span class="pending" role="status">${this.pendingCount === 1 ? Q("pendingOne") : Q("pendingMany", { count: this.pendingCount })}</span>` : H}
+            ${this.pendingCount ? z`<span class="pending" role="status">${this.pendingCount === 1 ? Q("pendingOne") : Q("pendingMany", { count: this.pendingCount })}</span>` : V}
             <button
               type="button"
               aria-label=${Q("save")}
@@ -884,16 +904,29 @@ var $ = class e extends Z {
           </div>
         </header>
 
+        <nav class="section-nav" aria-label="Exposure manager sections">
+          <button class="secondary" type="button" aria-label="Entities" aria-current=${this.section === "entities" ? "page" : V} @click=${() => {
+			this.section = "entities";
+		}}>Entities</button>
+          <button class="secondary" type="button" aria-label="Filter rules" aria-current=${this.section === "rules" ? "page" : V} @click=${this.openRules}>Filter rules</button>
+          <button class="secondary" type="button" aria-label="Settings" aria-current=${this.section === "settings" ? "page" : V} @click=${() => {
+			this.section = "settings", this.loadAdvanced();
+		}}>Settings</button>
+          ${this.pendingCount ? z`<button class="text-button" type="button" aria-label="Discard changes" ?disabled=${this.saving} @click=${this.discard}>Discard changes</button>` : V}
+        </nav>
+
         ${this.renderConfiguredMigration()}
-        ${this.status?.restart_required ? this.renderRestartBanner() : H}
-        ${this.editingEnabled ? H : B`<section class="message error" role="alert"><strong>${Q(this.strategy === "registry_default" ? "registryDefaultTitle" : "readOnlyTitle")}</strong><span>${this.strategy === "registry_default" ? Q("registryDefaultBody") : `${Q("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}`}</span></section>`}
-        ${this.saveError ? B`<section class="message error" role="alert"><strong>${Q("saveErrorTitle")}</strong><span>${this.saveError}</span></section>` : H}
-        ${this.validationIssues.length ? B`<section class="message error validation" role="alert"><strong>${Q("validationTitle")}</strong><ul>${this.validationIssues.map((e) => B`<li>${Q("validationIssue", {
+        ${this.status?.restart_required ? this.renderRestartBanner() : V}
+        ${!this.saving && !this.editingEnabled ? z`<section class="message error" role="alert"><strong>${Q(this.strategy === "registry_default" ? "registryDefaultTitle" : "readOnlyTitle")}</strong><span>${this.strategy === "registry_default" ? Q("registryDefaultBody") : `${Q("readOnlyBody")} ${(this.status?.read_only_reasons ?? []).join(" ")}`}</span></section>` : V}
+        ${this.saveError ? z`<section class="message error" role="alert"><strong>${Q("saveErrorTitle")}</strong><span>${this.saveError}</span></section>` : V}
+        ${this.validationIssues.length ? z`<section class="message error validation" role="alert"><strong>${Q("validationTitle")}</strong><ul>${this.validationIssues.map((e) => z`<li>${Q("validationIssue", {
 			entity: e.entity_id ?? e.field ?? Q("entitiesTitle"),
 			message: e.message
-		})}</li>`)}</ul></section>` : H}
+		})}</li>`)}</ul></section>` : V}
 
-        <section class="workspace">
+        ${this.section === "rules" ? this.renderRules() : V}
+        ${this.section === "settings" ? this.renderCleanup() : V}
+        <section class="workspace" ?hidden=${this.section !== "entities"}>
           <div class="toolbar">
             <label>
               <span class="sr-only">${Q("entitySearchLabel")}</span>
@@ -920,13 +953,13 @@ var $ = class e extends Z {
               </select>
             </label>
             <div class="toolbar-actions">
-              ${this.strategy === "registry_default" ? B`<div class="mode-control rule-mode">
+              ${this.strategy === "registry_default" ? z`<div class="mode-control rule-mode">
                     <span class="strategy-chip">${Q("registryDefaultStrategy")}</span>
                     <span><strong>${Q("registryDefaultLabel")}</strong><small>${Q("registryDefaultHelp")}</small></span>
-                  </div>` : this.strategy === "rule_based" ? B`<div class="mode-control rule-mode">
+                  </div>` : this.strategy === "rule_based" ? z`<div class="mode-control rule-mode">
                     <span class="strategy-chip">${Q("ruleBasedStrategy")}</span>
                     <span><strong>${Q("ruleBasedLabel")}</strong><small>${Q("ruleBasedHelp")}</small></span>
-                  </div>` : B`<div class="mode-control">
+                  </div>` : z`<div class="mode-control">
                     <button
                       class="toggle"
                       type="button"
@@ -935,7 +968,7 @@ var $ = class e extends Z {
                       aria-label=${Q("exposeNewLabel")}
                       ?disabled=${!this.editingEnabled}
                       @click=${() => {
-			this.exposeNewEntities = !this.exposeNewEntities, this.saveError = "";
+			this.editingEnabled && (this.exposeNewEntities = !this.exposeNewEntities, this.saveError = "");
 		}}
                     ><span></span></button>
                     <span><strong>${Q("exposeNewLabel")}</strong><small>${Q("exposeNewHelp")}</small></span>
@@ -945,15 +978,15 @@ var $ = class e extends Z {
               </button>
             </div>
           </div>
-          ${this.selectedEntities.length ? B`<div class="bulk-bar">
+          ${this.selectedEntities.length ? z`<div class="bulk-bar">
                 <strong>${Q("selectedCount", { count: this.selectedEntities.length })}</strong>
                 <button class="secondary" type="button" aria-label=${Q("exposeSelectedBulk")} ?disabled=${!this.editingEnabled} @click=${() => this.openBulkConfirm("expose")}>${Q("exposeSelectedBulk")}</button>
                 <button class="danger-secondary" type="button" aria-label=${Q("unexposeSelected")} ?disabled=${!this.editingEnabled} @click=${() => this.openBulkConfirm("unexpose")}>${Q("unexposeSelected")}</button>
                 <button class="text-button" type="button" @click=${() => {
 			this.selectedEntities = [];
 		}}>${Q("clearSelection")}</button>
-              </div>` : H}
-          ${n.length ? B`
+              </div>` : V}
+          ${n.length ? z`
                 <div class="entity-table" role="table">
                   <div class="table-head" role="row">
                     <span role="columnheader"></span>
@@ -965,15 +998,146 @@ var $ = class e extends Z {
                   </div>
                   ${n.map((e) => this.renderEntity(e))}
                 </div>
-              ` : B`<div class="empty"><strong>${Q(this.entityCount === 0 ? "emptyTitle" : "filteredEmptyTitle")}</strong><span>${Q(this.entityCount === 0 ? "emptyBody" : "filteredEmptyBody")}</span></div>`}
+              ` : z`<div class="empty"><strong>${Q(this.entityCount === 0 ? "emptyTitle" : "filteredEmptyTitle")}</strong><span>${Q(this.entityCount === 0 ? "emptyBody" : "filteredEmptyBody")}</span></div>`}
         </section>
-        ${this.renderAdvanced()}
+        ${this.section === "rules" ? V : this.renderAdvanced()}
       </div>
     `;
 	}
+	discard() {
+		this.cleanupMissing = [], this.staged = {}, this.rulesDraft = void 0, this.exposeNewEntities = this.baseExposeNewEntities, this.saveError = "", this.validationIssues = [], this.cleanupFindings = void 0, this.cleanupSelection = [], this.cleanupNotice = "";
+	}
+	async materializeFilter() {
+		if (this.saving) return !1;
+		if (!this.rulesDraft && this.exposeNewEntities !== this.baseExposeNewEntities && this.hass) {
+			let e = this.draftFingerprint();
+			try {
+				let t = await this.hass.connection.sendMessagePromise(this.previewMessage());
+				if (this.saving || e !== this.draftFingerprint()) return !1;
+				this.rulesDraft = t.filter ?? {};
+			} catch (e) {
+				return this.saveError = this.errorMessage(e), !1;
+			}
+		}
+		return !0;
+	}
+	async openRules() {
+		await this.materializeFilter() && (this.section = "rules");
+	}
+	async checkCleanup(e) {
+		if (!this.hass || this.saving || this.status?.read_only) return;
+		this.cleanupBusy = !0, this.cleanupNotice = "", this.cleanupFindings = void 0, this.cleanupSelection = [];
+		let t = this.draftFingerprint();
+		try {
+			let n = await this.hass.connection.sendMessagePromise({
+				...this.previewMessage(),
+				cleanup_checks: e
+			});
+			if (t !== this.draftFingerprint()) return;
+			this.cleanupFindings = n.cleanup_findings ?? [], this.cleanupChecks = e, this.cleanupFingerprint = t;
+		} catch (e) {
+			this.saveError = this.errorMessage(e);
+		} finally {
+			this.cleanupBusy = !1;
+		}
+	}
+	async stageCleanup() {
+		if (!(!this.hass || this.saving || this.status?.read_only || this.cleanupFingerprint !== this.draftFingerprint())) {
+			this.cleanupBusy = !0;
+			try {
+				let e = await this.hass.connection.sendMessagePromise({
+					...this.previewMessage(),
+					cleanup_checks: this.cleanupChecks,
+					cleanup_selected: this.cleanupSelection
+				});
+				if (this.saving || this.cleanupFingerprint !== this.draftFingerprint()) return;
+				this.rulesDraft = e.filter ?? {};
+				let t = e.cleanup_missing ?? [];
+				this.cleanupMissing = [.../* @__PURE__ */ new Set([...this.cleanupMissing, ...t])];
+				let n = { ...this.staged };
+				for (let e of t) n[e] = {
+					exposed: !1,
+					name: "",
+					description: "",
+					displayCategories: [],
+					remove: !0
+				};
+				this.staged = n, this.cleanupFindings = void 0, this.cleanupSelection = [], this.cleanupNotice = "Cleanup staged. Preview exposure changes, then Save to commit or Discard to cancel.", await this.updateComplete, await this.previewDraft();
+			} catch (e) {
+				this.saveError = this.errorMessage(e);
+			} finally {
+				this.cleanupBusy = !1;
+			}
+		}
+	}
+	renderCleanup() {
+		let e = this.cleanupFingerprint !== this.draftFingerprint();
+		return z`<section class="workspace rules-editor" aria-label="Cleanup">
+      <h2>Cleanup</h2>
+      <p>Preview safe changes to the managed files only. Devices in Home Assistant and Amazon are never deleted. Select findings to stage them in the shared draft.</p>
+      <button type="button" aria-label="Run all cleanup checks" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["duplicates", "missing"])}>Run all cleanup checks</button>
+      <button type="button" aria-label="Check duplicate rules" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["duplicates"])}>Check duplicate rules</button>
+      <button type="button" aria-label="Check missing references" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["missing"])}>Check missing references</button>
+      ${this.cleanupBusy ? z`<p role="status">Checking cleanup…</p>` : V}
+      ${this.cleanupNotice ? z`<p role="status">${this.cleanupNotice}</p>` : V}
+      ${this.cleanupFindings ? z`
+        <p>${this.cleanupFindings.length} findings · ${new Set(this.cleanupFindings.filter((e) => e.kind === "missing" || e.section?.endsWith("_entities")).map((e) => e.value)).size} affected entities (counted once)</p>
+        ${e ? z`<p role="status">Draft changed. Run cleanup checks again.</p>` : V}
+        ${this.cleanupFindings.length ? z`<ul>${this.cleanupFindings.map((t) => z`<li><label>
+          <input type="checkbox" aria-label=${`Select cleanup ${t.id}`} ?disabled=${e || this.cleanupBusy} .checked=${this.cleanupSelection.includes(t.id)} @change=${(e) => {
+			this.cleanupSelection = e.currentTarget.checked ? [...this.cleanupSelection, t.id] : this.cleanupSelection.filter((e) => e !== t.id);
+		}} /> <code>${t.value}</code> — ${t.kind === "missing" ? "Missing from registry and current states; remove explicit references and metadata" : `${t.section}: ${t.count} extra occurrence(s)`}
+        </label></li>`)}</ul>` : z`<p role="status">No cleanup findings.</p>`}
+        <button type="button" aria-label="Stage selected cleanup" ?disabled=${this.saving || this.status?.read_only || e || this.cleanupBusy || !this.cleanupSelection.length} @click=${this.stageCleanup}>Stage selected cleanup</button>
+      ` : V}
+    </section>`;
+	}
+	draftFingerprint() {
+		return JSON.stringify(this.previewMessage());
+	}
+	async previewDraft() {
+		if (!this.hass) return;
+		let e = this.draftFingerprint(), t = ++this.previewSequence;
+		this.previewLoading = !0, this.saveError = "";
+		try {
+			let n = await this.hass.connection.sendMessagePromise(this.previewMessage());
+			if (t !== this.previewSequence || e !== this.draftFingerprint()) return;
+			this.draftPreview = n, this.previewFingerprint = e;
+		} catch (e) {
+			t === this.previewSequence && (this.saveError = this.errorMessage(e));
+		} finally {
+			this.previewLoading = !1;
+		}
+	}
+	renderRules() {
+		let e = this.rulesDraft ?? this.entitiesResponse?.filter ?? {}, t = !this.saving && !this.status?.read_only && this.isConfigured(), n = this.draftPreview?.impact;
+		return z`<section class="workspace rules-editor" aria-label="Native filter rules">
+      <h2>Filter rules</h2>
+      <p>Home Assistant native filters. Enter one entity ID, domain, or glob pattern per line. Glob patterns are not regular expressions. Explicit entities, globs and domains use Home Assistant’s native precedence.</p>
+      <div class="rules-grid">${ge.map(([n, r]) => z`<label>
+        <span>${r}</span>
+        <textarea data-filter-key=${n} aria-label=${r} rows="5" spellcheck="false" ?disabled=${!t}
+          .value=${(e[n] ?? []).join("\n")}
+          @input=${(t) => {
+			let r = { ...e }, i = t.currentTarget.value.split("\n").map((e) => e.trim()).filter(Boolean);
+			i.length ? r[n] = i : delete r[n], this.rulesDraft = r;
+		}}></textarea>
+      </label>`)}</div>
+      <button type="button" aria-label="Preview exposure changes" ?disabled=${!t || this.previewLoading} @click=${this.previewDraft}>${this.previewLoading ? "Loading preview…" : "Preview exposure changes"}</button>
+      ${this.rulesDraft && !this.draftPreview ? z`<p role="status">Preview required before saving rule changes.</p>` : V}
+      ${n ? z`<section class="impact" role="status">
+        <strong>${n.exposed.length} newly exposed · ${n.hidden.length} newly hidden</strong>
+        <p>${this.draftPreview?.future_behavior}</p>
+        <details><summary>Review affected entities</summary>
+          <h3>Newly exposed</h3><ul>${n.exposed.map((e) => z`<li><code>${e}</code></li>`)}</ul>
+          <h3>Newly hidden</h3><ul>${n.hidden.map((e) => z`<li><code>${e}</code></li>`)}</ul>
+        </details>
+      </section>` : V}
+    </section>`;
+	}
 	renderEntity(e) {
-		let t = this.staged[e.entityId]?.exposed ?? e.exposed, n = Q(t ? "hideEntity" : "exposeEntity", { name: e.name });
-		return B`
+		let t = this.staged[e.entityId], n = this.draftPreview?.exposure?.[e.entityId] ?? t?.exposed ?? e.exposed, r = Q(n ? "hideEntity" : "exposeEntity", { name: e.name });
+		return z`
       <div class=${`entity-row${e.supported ? "" : " unsupported"}${e.missing ? " missing" : ""}`} role="row">
         <div role="cell">
           <input
@@ -996,91 +1160,78 @@ var $ = class e extends Z {
           <span class=${e.missing || !e.supported ? "warning" : "ok"}>
             ${e.missing ? Q("missing") : e.supported ? Q("available") : Q("unsupported")}
           </span>
-          ${!e.supported && e.unsupportedReason ? B`<small>${e.unsupportedReason}</small>` : H}
+          ${!e.supported && e.unsupportedReason ? z`<small>${e.unsupportedReason}</small>` : V}
         </div>
         <div class="exposure" role="cell">
-          <span class=${t ? "exposed" : "hidden"}>${Q(t ? "exposed" : "hidden")}</span>
+          <span class=${n ? "exposed" : "hidden"}>${Q(n ? "exposed" : "hidden")}</span>
+          <small>${this.draftPreview?.reasons?.[e.entityId] ?? (this.pendingCount ? "Draft exposure preview required" : e.exposureReason)}</small>
           <button
             class="toggle"
             type="button"
             role="switch"
-            aria-checked=${String(t)}
-            aria-label=${n}
+            aria-checked=${String(n)}
+            aria-label=${r}
             ?disabled=${e.missing || !e.supported || !this.editingEnabled}
-            @click=${() => this.stageExposure(e, !t)}
+            @click=${() => this.stageExposure(e, !n)}
           ><span></span></button>
         </div>
         <div role="cell" class="row-actions">
-          ${e.missing ? B`<button class="icon" type="button" aria-label=${Q("removeMissing", { name: e.name })} ?disabled=${!this.editingEnabled} @click=${() => this.stageRemove(e)}><ha-icon icon="mdi:delete-outline"></ha-icon></button>` : B`<button class="icon" type="button" aria-label=${Q("editMetadata", { name: e.name })} ?disabled=${!this.editingEnabled} @click=${(t) => this.openMetadataDialog(e, t)}><ha-icon icon="mdi:pencil"></ha-icon></button>`}
+          ${e.missing ? V : z`<button class="text-button" type="button" aria-label=${`Use rules for ${e.name}`} ?disabled=${this.saving || this.status?.read_only} @click=${() => this.useRules(e)}>Use rules</button>`}
+          ${e.missing ? z`<button class="icon" type="button" aria-label=${Q("removeMissing", { name: e.name })} ?disabled=${!this.editingEnabled} @click=${() => this.stageRemove(e)}><ha-icon icon="mdi:delete-outline"></ha-icon></button>` : z`<button class="icon" type="button" aria-label=${Q("editMetadata", { name: e.name })} ?disabled=${!this.editingEnabled} @click=${(t) => this.openMetadataDialog(e, t)}><ha-icon icon="mdi:pencil"></ha-icon></button>`}
         </div>
       </div>
     `;
 	}
-	stageRemove(e) {
-		let t = { ...this.staged };
-		t[e.entityId] = {
-			...this.draftFrom(e),
-			remove: !0,
-			exposed: !1
-		}, this.staged = t, this.saveError = "", this.validationIssues = [];
+	async stageRemove(e) {
+		this.section = "settings", await this.checkCleanup(["missing"]);
+		let t = `missing:${e.entityId}`;
+		this.cleanupFindings?.some((e) => e.id === t) && (this.cleanupSelection = [t]);
+	}
+	async useRules(e) {
+		this.editingEnabled && await this.materializeFilter() && this.editingEnabled && (this.rulesDraft = this.rulesDraft ?? structuredClone(this.entitiesResponse?.filter ?? {}), this.staged = {
+			...this.staged,
+			[e.entityId]: {
+				...this.staged[e.entityId] ?? this.draftFrom(e),
+				useRules: !0
+			}
+		}, await this.updateComplete, await this.previewDraft());
 	}
 	stageExposure(e, t) {
+		if (!this.editingEnabled) return;
 		let n = {
 			...this.staged[e.entityId] ?? this.draftFrom(e),
-			exposed: t
-		}, r = n.exposed === e.exposed && n.name === e.alexaName && n.description === e.description && n.displayCategories.join("|") === e.displayCategories.join("|"), i = { ...this.staged };
+			exposed: t,
+			useRules: !1,
+			exposureChanged: !0
+		}, r = !this.rulesDraft && n.exposed === e.exposed && n.name === e.alexaName && n.description === e.description && n.displayCategories.join("|") === e.displayCategories.join("|"), i = { ...this.staged };
 		r ? delete i[e.entityId] : i[e.entityId] = n, this.staged = i, this.saveError = "", this.validationIssues = [];
 	}
 	async save() {
-		if (!(!this.hass || !this.pendingCount)) {
-			this.saving = !0, this.saveError = "";
-			try {
-				let e = await this.hass.connection.sendMessagePromise(this.configurationMessage("alexa_exposure_manager/save"));
-				if (Array.isArray(e.validation_errors) && e.validation_errors.length > 0) {
-					this.validationIssues = e.validation_errors;
-					return;
+		if (this.hass && this.pendingCount && this.editingEnabled) {
+			if (this.rulesDraft && this.previewFingerprint !== this.draftFingerprint()) this.saveError = "Preview required. Review exposure changes before saving filter rules.";
+			else {
+				this.saving = !0, this.saveError = "";
+				try {
+					let e = await this.hass.connection.sendMessagePromise(this.configurationMessage("alexa_exposure_manager/save"));
+					if (Array.isArray(e.validation_errors) && e.validation_errors.length > 0) {
+						this.validationIssues = e.validation_errors;
+						return;
+					}
+					this.staged = {}, this.cleanupMissing = [], this.rulesDraft = void 0, await this.load(), this.status = {
+						...this.status,
+						...e
+					}, this.previewResponse = void 0, this.backupsResponse = void 0;
+				} catch (e) {
+					let t = this.errorMessage(e), n = this.errorCode(e);
+					this.saveError = /conflict|revision/i.test(`${n} ${t}`) ? `${Q("saveConflictTitle")}. ${Q("saveConflictBody")}` : t;
+				} finally {
+					this.saving = !1;
 				}
-				let t = this.staged;
-				this.status = {
-					...this.status,
-					expose_new_entities: this.exposeNewEntities,
-					...e
-				}, this.entitiesResponse = {
-					...this.entitiesResponse,
-					revision: e.revision ?? this.entitiesResponse?.revision,
-					entities_revision: e.entities_revision ?? this.entitiesResponse?.entities_revision,
-					expose_new_entities: this.exposeNewEntities,
-					entities: this.normalizedEntities.map((e) => {
-						let n = t[e.entityId];
-						return {
-							entity_id: e.entityId,
-							name: e.name,
-							state: e.state,
-							area_name: e.areaName,
-							device_name: e.deviceName,
-							integration: e.integration,
-							supported: e.supported,
-							missing: e.missing,
-							unsupported_reason: e.unsupportedReason,
-							exposed: n?.exposed ?? e.exposed,
-							exposure: n ? n.exposed ? "include" : "exclude" : e.exposure,
-							alexa_name: n?.name ?? e.alexaName,
-							description: n?.description ?? e.description,
-							display_categories: n?.displayCategories ?? e.displayCategories,
-							inferred_display_category: e.inferredDisplayCategory
-						};
-					})
-				}, this.baseExposeNewEntities = this.exposeNewEntities, this.staged = {};
-			} catch (e) {
-				let t = this.errorMessage(e), n = this.errorCode(e);
-				this.saveError = /conflict|revision/i.test(`${n} ${t}`) ? `${Q("saveConflictTitle")}. ${Q("saveConflictBody")}` : t;
-			} finally {
-				this.saving = !1;
 			}
 		}
 	}
 	renderRestartBanner() {
-		return this.restartBannerDismissed ? H : B`
+		return this.restartBannerDismissed ? V : z`
       <section class="restart" role="status">
         <ha-icon icon="mdi:restart-alert"></ha-icon>
         <div><strong>${Q("restartTitle")}</strong><span>${Q("restartBody")} ${Q("discoveryBody")}</span></div>
@@ -1099,16 +1250,21 @@ var $ = class e extends Z {
 		return {
 			type: e,
 			expected_revision: this.status?.revision ?? "",
+			...this.cleanupMissing.length ? { cleanup_missing: this.cleanupMissing } : {},
 			expected_entities_revision: this.entitiesResponse?.entities_revision ?? this.status?.entities_revision ?? "",
 			expose_new_entities: this.exposeNewEntities,
-			entities: this.entityUpdates()
+			entities: this.entityUpdates(),
+			...this.rulesDraft ? { filter_config: this.rulesDraft } : {}
 		};
 	}
 	previewMessage() {
 		return {
 			type: "alexa_exposure_manager/preview",
+			expected_revision: this.status?.revision ?? "",
+			expected_entities_revision: this.entitiesResponse?.entities_revision ?? this.status?.entities_revision ?? "",
 			expose_new_entities: this.exposeNewEntities,
-			entities: this.entityUpdates()
+			entities: this.entityUpdates(),
+			...this.rulesDraft ? { filter_config: this.rulesDraft } : {}
 		};
 	}
 	entityUpdates() {
@@ -1117,20 +1273,20 @@ var $ = class e extends Z {
 			remove: !0
 		} : {
 			entity_id: e,
-			exposed: t.exposed,
+			...t.useRules ? { use_rules: !0 } : t.exposureChanged || !this.rulesDraft ? { exposed: t.exposed } : {},
 			name: t.name,
 			description: t.description,
 			display_categories: t.displayCategories.slice(0, 1)
 		});
 	}
 	get pendingCount() {
-		return Object.keys(this.staged).length + (this.strategy === "rule_based" || this.exposeNewEntities === this.baseExposeNewEntities ? 0 : 1);
+		return Object.keys(this.staged).length + +!!this.rulesDraft + (this.strategy === "rule_based" || this.exposeNewEntities === this.baseExposeNewEntities ? 0 : 1);
 	}
 	get strategy() {
-		return this.entitiesResponse?.strategy ?? this.status?.strategy ?? (this.exposeNewEntities ? "blocklist" : "allowlist");
+		return this.rulesDraft ? "rule_based" : this.entitiesResponse?.strategy ?? this.status?.strategy ?? (this.exposeNewEntities ? "blocklist" : "allowlist");
 	}
 	get editingEnabled() {
-		return this.status?.editing_enabled !== !1 && this.status?.read_only !== !0;
+		return this.saving ? !1 : this.rulesDraft && this.isConfigured() && !this.status?.read_only ? !0 : this.status?.editing_enabled !== !1 && this.status?.read_only !== !0;
 	}
 	async openAddDialog(e) {
 		this.dialogTrigger = e.currentTarget, this.addQuery = "", this.addSelection = [], this.candidateWindowStart = 0, this.addDialogOpen = !0, await this.updateComplete, this.renderRoot.querySelector(`[aria-label="${Q("addSearchLabel")}"]`)?.focus();
@@ -1148,7 +1304,7 @@ var $ = class e extends Z {
 			].join(" ").toLocaleLowerCase().includes(t);
 			return !n && !e.missing && r;
 		}), r = e.CANDIDATE_WINDOW, i = Math.min(this.candidateWindowStart, Math.max(0, n.length - r)), a = n.slice(i, i + r);
-		return B`
+		return z`
       <div class="dialog-backdrop" @mousedown=${(e) => {
 			e.target === e.currentTarget && this.closeAddDialog();
 		}}>
@@ -1170,10 +1326,10 @@ var $ = class e extends Z {
             />
           </label>
           <div class="candidate-list" @scroll=${(e) => this.onCandidateScroll(e, n.length)}>
-            ${i > 0 ? B`<div class="virtual-spacer" style=${`height:${i * 56}px`}></div>` : H}
+            ${i > 0 ? z`<div class="virtual-spacer" style=${`height:${i * 56}px`}></div>` : V}
             ${a.length ? a.map((e) => {
 			let t = !e.supported;
-			return B`
+			return z`
                   <label class=${`candidate-row${t ? " disabled" : ""}`}>
                     <input
                       type="checkbox"
@@ -1190,12 +1346,12 @@ var $ = class e extends Z {
                     </span>
                     <small>
                       ${e.deviceName || Q("noDevice")} · ${e.areaName || Q("noArea")}
-                      ${t ? B`<span class="unsupported-reason">${Q("unsupportedCandidate", { reason: e.unsupportedReason || Q("unsupported") })}</span>` : H}
+                      ${t ? z`<span class="unsupported-reason">${Q("unsupportedCandidate", { reason: e.unsupportedReason || Q("unsupported") })}</span>` : V}
                     </small>
                   </label>
                 `;
-		}) : B`<div class="empty compact"><strong>${Q("noCandidatesTitle")}</strong><span>${Q("noCandidatesBody")}</span></div>`}
-            ${i + a.length < n.length ? B`<div class="virtual-spacer" style=${`height:${(n.length - i - a.length) * 56}px`}></div>` : H}
+		}) : z`<div class="empty compact"><strong>${Q("noCandidatesTitle")}</strong><span>${Q("noCandidatesBody")}</span></div>`}
+            ${i + a.length < n.length ? z`<div class="virtual-spacer" style=${`height:${(n.length - i - a.length) * 56}px`}></div>` : V}
           </div>
           <footer>
             <span>${Q("candidateCount", {
@@ -1246,7 +1402,7 @@ var $ = class e extends Z {
 	}
 	renderBulkConfirmation() {
 		let e = this.bulkAction === "expose", t = Q(e ? "bulkExposeConfirmTitle" : "bulkUnexposeConfirmTitle", { count: this.selectedEntities.length }), n = Q(e ? "bulkExposeConfirmBody" : "bulkUnexposeConfirmBody"), r = Q(e ? "confirmExpose" : "confirmUnexpose");
-		return B`
+		return z`
       <div class="dialog-backdrop">
         <section class="dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="bulk-confirm-title" @keydown=${(e) => {
 			e.key === "Escape" && (this.bulkConfirmOpen = !1);
@@ -1263,6 +1419,7 @@ var $ = class e extends Z {
     `;
 	}
 	confirmBulkAction() {
+		if (!this.editingEnabled) return;
 		let e = new Map(this.normalizedEntities.map((e) => [e.entityId, e])), t = { ...this.staged }, n = this.bulkAction === "expose";
 		for (let r of this.selectedEntities) {
 			let i = e.get(r);
@@ -1270,9 +1427,11 @@ var $ = class e extends Z {
 			let a = {
 				...t[r] ?? this.draftFrom(i),
 				exposed: n,
-				remove: void 0
+				remove: void 0,
+				useRules: !1,
+				exposureChanged: !0
 			};
-			i.exposed === n && a.name === i.alexaName && a.description === i.description && a.displayCategories.join("|") === i.displayCategories.join("|") ? delete t[r] : t[r] = a;
+			!this.rulesDraft && i.exposed === n && a.name === i.alexaName && a.description === i.description && a.displayCategories.join("|") === i.displayCategories.join("|") ? delete t[r] : t[r] = a;
 		}
 		this.staged = t, this.selectedEntities = [], this.addSelection = [], this.bulkConfirmOpen = !1, this.saveError = "", this.validationIssues = [];
 	}
@@ -1287,9 +1446,9 @@ var $ = class e extends Z {
 	}
 	renderMetadataDialog() {
 		let e = this.normalizedEntities.find((e) => e.entityId === this.metadataEntityId), t = this.metadataDraft;
-		if (!e || !t) return H;
+		if (!e || !t) return V;
 		let n = t.exposed;
-		return B`
+		return z`
       <div class="dialog-backdrop">
         <section class="dialog metadata-dialog" role="dialog" aria-modal="true" aria-labelledby="metadata-dialog-title" @keydown=${(e) => {
 			e.key === "Escape" && this.closeMetadataDialog();
@@ -1340,24 +1499,24 @@ var $ = class e extends Z {
 		}}
                 >
                   <option value="">${Q("noDisplayCategory")}</option>
-                  ${me.map((e) => B`<option value=${e}>${e}</option>`)}
+                  ${me.map((e) => z`<option value=${e}>${e}</option>`)}
                 </select>
               </label>
             </fieldset>
           </div>
           <footer>
             <button class="secondary" type="button" @click=${this.closeMetadataDialog}>${Q("cancel")}</button>
-            <button type="button" aria-label=${Q("applyMetadata")} @click=${this.applyMetadata}>${Q("applyMetadata")}</button>
+            <button type="button" aria-label=${Q("applyMetadata")} ?disabled=${!this.editingEnabled} @click=${this.applyMetadata}>${Q("applyMetadata")}</button>
           </footer>
         </section>
       </div>
     `;
 	}
 	applyMetadata() {
-		if (!this.metadataEntityId || !this.metadataDraft) return;
+		if (!this.editingEnabled || !this.metadataEntityId || !this.metadataDraft) return;
 		let e = this.normalizedEntities.find((e) => e.entityId === this.metadataEntityId);
 		if (!e) return;
-		let t = this.metadataDraft.exposed === e.exposed && this.metadataDraft.name === e.alexaName && this.metadataDraft.description === e.description && this.metadataDraft.displayCategories.join("|") === e.displayCategories.join("|"), n = { ...this.staged };
+		let t = !this.metadataDraft.useRules && !this.metadataDraft.exposureChanged && this.metadataDraft.exposed === e.exposed && this.metadataDraft.name === e.alexaName && this.metadataDraft.description === e.description && this.metadataDraft.displayCategories.join("|") === e.displayCategories.join("|"), n = { ...this.staged };
 		t ? delete n[e.entityId] : n[e.entityId] = {
 			...this.metadataDraft,
 			displayCategories: [...this.metadataDraft.displayCategories]
@@ -1370,17 +1529,22 @@ var $ = class e extends Z {
 		return e && typeof e == "object" && "code" in e ? String(e.code) : "";
 	}
 	renderAdvanced() {
-		return B`
+		return this.section === "settings" ? z`<section aria-label="Recovery and diagnostics">
+      <h2>Recovery and diagnostics</h2>
+      ${this.advancedLoading ? z`<p role="status">${Q("advancedLoading")}</p>` : V}
+      ${this.advancedError ? z`<p role="alert">${this.advancedError}</p>` : V}
+      ${this.renderAdvancedGrid()}
+    </section>` : z`
       <section class="advanced">
         <button class="advanced-toggle" type="button" aria-label=${Q("advancedTools")} aria-expanded=${String(this.advancedOpen)} @click=${this.toggleAdvanced}>
           <span><strong>${Q("advancedTools")}</strong><small>${Q("advancedBody")}</small></span>
           <ha-icon icon=${this.advancedOpen ? "mdi:chevron-up" : "mdi:chevron-down"}></ha-icon>
         </button>
-        ${this.advancedOpen ? B`<div class="advanced-content">
-              ${this.advancedLoading ? B`<div class="advanced-state" role="status">${Q("advancedLoading")}</div>` : H}
-              ${this.advancedError ? B`<div class="message error" role="alert">${this.advancedError}</div>` : H}
-              ${this.advancedLoading ? H : this.renderAdvancedGrid()}
-            </div>` : H}
+        ${this.advancedOpen ? z`<div class="advanced-content">
+              ${this.advancedLoading ? z`<div class="advanced-state" role="status">${Q("advancedLoading")}</div>` : V}
+              ${this.advancedError ? z`<div class="message error" role="alert">${this.advancedError}</div>` : V}
+              ${this.advancedLoading ? V : this.renderAdvancedGrid()}
+            </div>` : V}
       </section>
     `;
 	}
@@ -1395,7 +1559,7 @@ var $ = class e extends Z {
 	}
 	renderAdvancedGrid() {
 		let e = String(this.previewResponse?.filter_yaml ?? this.previewResponse?.filter ?? ""), t = String(this.previewResponse?.entity_config_yaml ?? this.previewResponse?.entity_config ?? ""), n = (Array.isArray(this.backupsResponse?.backups) ? this.backupsResponse.backups : []).filter((e) => !!(e && typeof e == "object"));
-		return B`
+		return z`
       <div class="advanced-grid">
         <section class="advanced-card yaml-card">
           <h3>${Q("yamlPreview")}</h3>
@@ -1404,13 +1568,14 @@ var $ = class e extends Z {
         </section>
         <section class="advanced-card">
           <h3>${Q("backupsTitle")}</h3><p>${Q("backupsBody")}</p>
+          ${this.pendingCount ? z`<p role="status">Save or Discard pending changes before restoring a backup.</p>` : V}
           <div class="backup-list">
             ${n.length ? n.map((e) => {
 			let t = String(e.id ?? e.backup_id ?? "");
-			return B`<div><span><strong>${t}</strong><small>${String(e.created_at ?? e.created ?? e.timestamp ?? "")} · ${String(e.revision ?? "")}</small></span><button class="secondary" type="button" aria-label=${Q("restoreBackup", { id: t })} @click=${() => {
+			return z`<div><span><strong>${t}</strong><small>${this.backupTimestamp(e)} · ${e.healthy === !1 ? "Unhealthy" : "Backup pair"}</small><small>${String(e.health_reason ?? "")}</small></span><button class="secondary" type="button" aria-label=${Q("restoreBackup", { id: t })} ?disabled=${e.healthy === !1 || !!this.pendingCount || this.saving} @click=${() => {
 				this.confirmationTarget = t, this.confirmation = "restore";
 			}}>${Q("restoreBackup", { id: t })}</button></div>`;
-		}) : B`<span class="muted">${Q("noBackups")}</span>`}
+		}) : z`<span class="muted">${Q("noBackups")}</span>`}
           </div>
         </section>
         <section class="advanced-card">
@@ -1422,8 +1587,8 @@ var $ = class e extends Z {
           <div class="card-actions"><button class="secondary" type="button" aria-label=${Q("runDiagnostics")} @click=${this.runDiagnostics}>${Q("runDiagnostics")}</button><button class="secondary" type="button" aria-label=${Q("supportExport")} @click=${() => {
 			this.confirmation = "support";
 		}}>${Q("supportExport")}</button></div>
-          ${this.diagnosticsResponse ? B`<pre class="diagnostics"><code>${JSON.stringify(this.diagnosticsResponse, null, 2)}</code></pre>` : H}
-          ${this.operationMessage ? B`<p class="operation-message" role="status">${this.operationMessage}</p>` : H}
+          ${this.diagnosticsResponse ? z`<pre class="diagnostics"><code>${JSON.stringify(this.diagnosticsResponse, null, 2)}</code></pre>` : V}
+          ${this.operationMessage ? z`<p class="operation-message" role="status">${this.operationMessage}</p>` : V}
         </section>
       </div>
     `;
@@ -1445,6 +1610,10 @@ var $ = class e extends Z {
 			error: n
 		});
 	}
+	backupTimestamp(e) {
+		let t = String(e.created_at ?? e.created ?? e.timestamp ?? ""), n = t.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\.\d+)?Z$/, "$1-$2-$3T$4:$5:$6$7Z"), r = new Date(n);
+		return Number.isNaN(r.getTime()) ? t : r.toLocaleString();
+	}
 	migrationStateLabel() {
 		switch (this.status?.migration_state) {
 			case "complete": return Q("migrationComplete");
@@ -1461,10 +1630,13 @@ var $ = class e extends Z {
 	}
 	renderOperationConfirmation() {
 		let e = this.confirmation, t = e === "restore" ? Q("restoreTitle", { id: this.confirmationTarget ?? "" }) : Q(e === "support" ? "supportWarningTitle" : e === "restart" ? "restartConfirmTitle" : "migrationConfirmTitle"), n = Q(e === "restore" ? "restoreBody" : e === "support" ? "supportWarningBody" : e === "restart" ? "restartConfirmBody" : "migrationConfirmBody"), r = Q(e === "restore" ? "confirmRestore" : e === "support" ? "confirmSupportExport" : e === "restart" ? "confirmRestart" : "confirmMigration");
-		return B`
+		return z`
       <div class="dialog-backdrop">
         <section class="dialog confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="operation-confirm-title" @keydown=${(e) => {
-			e.key === "Escape" && this.closeOperationConfirmation();
+			if (e.key === "Escape" && this.closeOperationConfirmation(), e.key === "Tab") {
+				let t = e.currentTarget.querySelectorAll("button:not(:disabled)"), n = t[0], r = t[t.length - 1], i = this.renderRoot.activeElement;
+				e.shiftKey && i === n ? (e.preventDefault(), r?.focus()) : !e.shiftKey && i === r && (e.preventDefault(), n?.focus());
+			}
 		}}>
           <header><div><h2 id="operation-confirm-title">${t}</h2><p>${n}</p></div></header>
           <footer><button class="secondary" type="button" @click=${this.closeOperationConfirmation}>${Q("cancel")}</button><button class=${e === "restore" ? "danger" : ""} type="button" aria-label=${r} @click=${this.confirmOperation}>${r}</button></footer>
@@ -1477,10 +1649,15 @@ var $ = class e extends Z {
 	}
 	async confirmOperation() {
 		if (!this.hass || !this.confirmation) return;
-		let e = this.confirmation, t = this.confirmationTarget;
+		let e = this.confirmation, t = this.confirmationTarget, n = !1;
 		this.closeOperationConfirmation();
 		try {
 			if (e === "restore") {
+				if (this.pendingCount || this.saving) {
+					this.advancedError = "Save or Discard pending changes before restoring a backup.";
+					return;
+				}
+				this.saving = !0, n = !0;
 				let e = await this.hass.connection.sendMessagePromise({
 					type: "alexa_exposure_manager/restore",
 					backup_id: t ?? "",
@@ -1490,7 +1667,10 @@ var $ = class e extends Z {
 				this.status = {
 					...this.status,
 					...e
-				};
+				}, this.discard(), this.previewResponse = void 0, this.backupsResponse = void 0, await this.load(), this.status = {
+					...this.status,
+					...e
+				}, await this.loadAdvanced();
 			} else if (e === "restart") await this.hass.connection.sendMessagePromise({
 				type: "alexa_exposure_manager/restart",
 				confirmed: !0
@@ -1510,6 +1690,8 @@ var $ = class e extends Z {
 		} catch (t) {
 			let n = this.errorMessage(t);
 			e === "migration" ? (this.migrationError = `${n} ${Q("migrationPreviewAgain")}`, this.migrationPreviewResponse = void 0) : this.isConfigured() ? this.advancedError = n : this.error = n;
+		} finally {
+			n && (this.saving = !1);
 		}
 	}
 	downloadSupportExport(e) {
@@ -1543,7 +1725,7 @@ var $ = class e extends Z {
 	}
 	migrationSource() {
 		let e = this.migrationPreviewResponse?.legacy_source;
-		if (!e || typeof e != "object") return H;
+		if (!e || typeof e != "object") return V;
 		let t = e;
 		return t.from_snapshot === !0 ? Q("migrationSourceSnapshot", { captured: String(t.captured_at ?? "") }) : Q("migrationSourceLive");
 	}
@@ -1576,6 +1758,7 @@ var $ = class e extends Z {
 			missing: l,
 			unsupportedReason: String(t.unsupported_reason ?? ""),
 			exposed: c,
+			exposureReason: String(t.exposure_reason ?? ""),
 			exposure: t.exposure === "include" || t.exposure === "exclude" || t.exposure === "inherited" || t.exposure === "new" ? t.exposure : c ? "include" : "exclude",
 			alexaName: String(t.alexa_name ?? t.name_override ?? r.name ?? ""),
 			description: String(t.description ?? r.description ?? ""),
@@ -1603,6 +1786,20 @@ var $ = class e extends Z {
 		}[e] ?? "mdi:home-assistant";
 	}
 	static styles = o`
+    [hidden] { display: none !important; }
+    .section-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .section-nav [aria-current="page"] { border-color: var(--primary-color, #03a9f4); color: var(--primary-color, #03a9f4); }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--primary-color, #03a9f4); outline-offset: 3px; }
+    .exposure small { display: block; max-width: 26ch; color: var(--secondary-text-color, #616161); font-size: 12px; }
+    .rules-editor li { margin: 12px 0; overflow-wrap: anywhere; }
+    .rules-editor > button { margin: 4px 8px 4px 0; }
+    .rules-editor { padding: 20px; }
+    .rules-editor p { max-width: 75ch; line-height: 1.5; }
+    .rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+    .rules-grid label { display: grid; gap: 8px; }
+    .rules-grid textarea { box-sizing: border-box; width: 100%; resize: vertical; font: inherit; color: var(--primary-text-color, #212121); background: var(--card-background-color, #fff); border: 1px solid var(--divider-color, #ccc); border-radius: 4px; padding: 10px; }
+    .impact { margin-top: 16px; padding: 16px; border-left: 3px solid var(--primary-color, #03a9f4); }
+    @media (max-width: 600px) { .rules-grid { grid-template-columns: 1fr; } }
     :host {
       display: block;
       min-height: 100%;
@@ -1646,7 +1843,7 @@ var $ = class e extends Z {
     .row-actions { display: flex; justify-content: flex-end; gap: 4px; }
     .virtual-spacer { pointer-events: none; }
     .restart-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .table-head, .entity-row { display: grid; grid-template-columns: 24px minmax(260px, 1.35fr) minmax(190px, .9fr) minmax(190px, .9fr) minmax(170px, .7fr) 40px; align-items: center; gap: 18px; padding: 0 20px; }
+    .table-head, .entity-row { display: grid; grid-template-columns: 24px minmax(220px, 1.35fr) minmax(150px, .9fr) minmax(150px, .9fr) minmax(170px, .7fr) 130px; align-items: center; gap: 18px; padding: 0 20px; }
     .table-head { min-height: 44px; color: var(--secondary-text-color, #616161); background: var(--secondary-background-color, #f5f5f5); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
     .entity-row { min-height: 76px; border-top: 1px solid var(--divider-color, #e0e0e0); }
     .row-checkbox { width: 18px; min-height: 18px; }
@@ -1658,7 +1855,9 @@ var $ = class e extends Z {
     .context small, .availability small { margin-top: 5px; color: var(--secondary-text-color, #616161); font-size: 12px; }
     .availability .ok { color: var(--success-color, #2e7d32); }
     .availability .warning { color: var(--warning-color, #f57c00); font-weight: 600; }
-    .exposure { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .entity-row .exposure { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 4px 12px; }
+    .exposure small { grid-column: 1; grid-row: 2; overflow-wrap: anywhere; }
+    .exposure .toggle { grid-column: 2; grid-row: 1 / 3; }
     .exposure > span { font-size: 13px; font-weight: 600; }
     .exposure .exposed { color: var(--primary-color, #03a9f4); }
     .toggle { position: relative; width: 44px; min-width: 44px; min-height: 40px; height: 40px; padding: 0; border-radius: 999px; background: transparent; }
@@ -1782,7 +1981,7 @@ var $ = class e extends Z {
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (max-width: 900px) {
       main { padding: 20px; }
-      .table-head, .entity-row { grid-template-columns: 24px minmax(220px, 1.2fr) minmax(170px, .8fr) minmax(160px, .8fr) 40px; }
+      .table-head, .entity-row { grid-template-columns: 24px minmax(190px, 1.2fr) minmax(150px, .8fr) minmax(170px, .8fr) 130px; }
       .table-head > :nth-child(3), .entity-row > :nth-child(3) { display: none; }
     }
     @media (max-width: 620px) {
