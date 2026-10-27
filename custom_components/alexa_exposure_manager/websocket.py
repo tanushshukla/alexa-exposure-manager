@@ -113,7 +113,7 @@ async def websocket_entities(hass, connection, msg) -> None:
         vol.Required("expose_new_entities"): bool,
         vol.Optional("entities", default=[]): [ENTITY_UPDATE_SCHEMA],
         vol.Optional("filter_config"): dict,
-        vol.Optional("cleanup_checks"): [vol.In(["duplicates"])],
+        vol.Optional("cleanup_checks"): [vol.In(["duplicates", "missing"])],
         vol.Optional("cleanup_selected"): [str],
     }
 )
@@ -132,6 +132,7 @@ async def websocket_preview(hass, connection, msg) -> None:
         vol.Required("expose_new_entities"): bool,
         vol.Optional("entities", default=[]): [ENTITY_UPDATE_SCHEMA],
         vol.Optional("filter_config"): dict,
+        vol.Optional("cleanup_missing"): [str],
     }
 )
 @websocket_api.require_admin

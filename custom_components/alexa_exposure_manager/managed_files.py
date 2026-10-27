@@ -200,6 +200,7 @@ class ManagedFileTransaction:
         entities: list[Mapping[str, Any]],
         known_entity_ids: Collection[str],
         filter_config: Mapping[str, Any] | None = None,
+        pre_commit: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         """Save both files through one serialized, revision-checked transaction."""
         async with self._lock:
@@ -218,6 +219,7 @@ class ManagedFileTransaction:
             return await self._async_commit_bytes(
                 filter_text.encode(),
                 entity_text.encode(),
+                pre_commit=pre_commit,
                 write_error=(
                     "Managed file write failed; the previous files were restored"
                 ),
@@ -302,9 +304,12 @@ class ManagedFileTransaction:
         rollback_error_prefix: str,
         expected_filter: Mapping[str, list[str]] | None = None,
         expected_entity_config: Mapping[str, Mapping[str, Any]] | None = None,
+        pre_commit: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         """Backup, replace, validate, and roll back both managed files together."""
         old_filter, old_entities = await self._executor(self._read_bytes_pair)
+        if pre_commit is not None:
+            pre_commit()
         try:
             await self._executor(
                 self._backup_and_replace_bytes, filter_bytes, entity_bytes
@@ -312,6 +317,11 @@ class ManagedFileTransaction:
         except OSError as error:
             raise ManagedFilesError(write_error) from error
         validation_error = await self._validator()
+        if pre_commit is not None and validation_error is None:
+            try:
+                pre_commit()
+            except InvalidManagedConfigurationError as error:
+                validation_error = str(error)
         if validation_error is not None:
             try:
                 await self._executor(self._replace_bytes_pair, old_filter, old_entities)

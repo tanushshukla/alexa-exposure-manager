@@ -22,6 +22,116 @@ async def valid():
     return None
 
 
+async def test_metadata_only_missing_reference_is_found(runtime):
+    preview = await runtime.async_preview(
+        {
+            "expose_new_entities": False,
+            "filter_config": {},
+            "entities": [{"entity_id": "light.metadata_only", "name": "Old"}],
+            "cleanup_checks": ["missing"],
+        }
+    )
+    assert [item["value"] for item in preview["cleanup_findings"]] == [
+        "light.metadata_only"
+    ]
+
+
+async def test_cleanup_reappearing_during_validation_rolls_back(
+    runtime, hass, tmp_path
+):
+    from custom_components.alexa_exposure_manager.managed_files import (
+        ValidationFailedError,
+    )
+
+    before = await runtime.transaction.async_read()
+
+    async def reappear():
+        hass.states.async_set("light.gone", "on")
+        return None
+
+    runtime.transaction = ManagedFileTransaction(tmp_path, execute, reappear)
+    with pytest.raises(ValidationFailedError, match="reappeared"):
+        await runtime.async_save(
+            {
+                "expose_new_entities": False,
+                "filter_config": {},
+                "cleanup_missing": ["light.gone"],
+                "expected_revision": before["revision"],
+                "expected_entities_revision": before["entities_revision"],
+            }
+        )
+    assert (await runtime.transaction.async_read())["revision"] == before["revision"]
+
+
+async def test_missing_cleanup_preserves_registry_and_states_and_removes_metadata(
+    runtime, hass
+):
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    registered = registry.async_get_or_create(
+        "light", "test", "disabled", suggested_object_id="disabled"
+    )
+    hass.states.async_set("light.state_only", "unavailable")
+    rules = {
+        "include_entities": [registered.entity_id, "light.state_only", "light.gone"],
+        "exclude_entities": ["light.gone"],
+        "include_entity_globs": ["light.gone*"],
+    }
+    message = {
+        "expose_new_entities": False,
+        "filter_config": rules,
+        "entities": [{"entity_id": "light.gone", "name": "Gone"}],
+        "cleanup_checks": ["missing"],
+    }
+    result = await runtime.async_preview(message)
+    assert [finding["value"] for finding in result["cleanup_findings"]] == [
+        "light.gone"
+    ]
+    result = await runtime.async_preview(
+        {**message, "cleanup_selected": ["missing:light.gone"]}
+    )
+    assert "light.gone" not in result["filter"]["include_entities"]
+    assert result["filter"]["exclude_entities"] == []
+    assert result["filter"]["include_entity_globs"] == ["light.gone*"]
+    assert "light.gone" not in result["entity_config"]
+    assert result["cleanup_missing"] == ["light.gone"]
+    catalog = await runtime.async_entities()
+    assert not next(
+        entity
+        for entity in catalog["entities"]
+        if entity["entity_id"] == registered.entity_id
+    )["missing"]
+
+
+async def test_missing_cleanup_blocks_startup_and_reappearing_entity(runtime, hass):
+    from homeassistant.core import CoreState
+
+    message = {
+        "expose_new_entities": False,
+        "filter_config": {"include_entities": ["light.gone"]},
+        "cleanup_checks": ["missing"],
+    }
+    hass.set_state(CoreState.starting)
+    with pytest.raises(InvalidManagedConfigurationError, match="inventory"):
+        await runtime.async_preview(message)
+    hass.set_state(CoreState.running)
+    before = await runtime.transaction.async_read()
+    hass.states.async_set("light.gone", "on")
+    with pytest.raises(InvalidManagedConfigurationError, match="reappeared"):
+        await runtime.async_save(
+            {
+                "expose_new_entities": False,
+                "filter_config": {},
+                "cleanup_missing": ["light.gone"],
+                "expected_revision": before["revision"],
+                "expected_entities_revision": before["entities_revision"],
+            }
+        )
+    assert (await runtime.transaction.async_read())["revision"] == before["revision"]
+    assert await runtime.transaction.async_list_backups() == []
+
+
 async def test_duplicate_cleanup_is_selective_and_does_not_write(runtime):
     before = await runtime.transaction.async_read()
     rules = {

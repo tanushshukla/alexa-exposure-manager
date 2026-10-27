@@ -113,6 +113,7 @@ export class AlexaExposureManagerPanel extends LitElement {
   declare private cleanupNotice: string;
   private cleanupFingerprint = "";
   private cleanupChecks: string[] = [];
+  private cleanupMissing: string[] = [];
   private dialogTrigger?: HTMLElement;
   private loadedConnection?: HomeAssistant["connection"];
   private static readonly CANDIDATE_WINDOW = 40;
@@ -473,6 +474,7 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private discard() {
+    this.cleanupMissing = [];
     this.staged = {};
     this.rulesDraft = undefined;
     this.exposeNewEntities = this.baseExposeNewEntities;
@@ -511,6 +513,13 @@ export class AlexaExposureManagerPanel extends LitElement {
       });
       if (this.cleanupFingerprint !== this.draftFingerprint()) return;
       this.rulesDraft = result.filter ?? {};
+      const missing = result.cleanup_missing ?? [];
+      this.cleanupMissing = [...new Set([...this.cleanupMissing, ...missing])];
+      const staged = { ...this.staged };
+      for (const entityId of missing) {
+        staged[entityId] = { exposed: false, name: "", description: "", displayCategories: [], remove: true };
+      }
+      this.staged = staged;
       this.cleanupFindings = undefined;
       this.cleanupSelection = [];
       this.cleanupNotice = "Cleanup staged. Preview exposure changes, then Save to commit or Discard to cancel.";
@@ -526,6 +535,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       <h2>Cleanup</h2>
       <p>Preview safe changes to the managed files only. Devices in Home Assistant and Amazon are never deleted. Select findings to stage them in the shared draft.</p>
       <button type="button" aria-label="Check duplicate rules" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["duplicates"])}>Check duplicate rules</button>
+      <button type="button" aria-label="Check missing references" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["missing"])}>Check missing references</button>
       ${this.cleanupBusy ? html`<p role="status">Checking cleanup…</p>` : nothing}
       ${this.cleanupNotice ? html`<p role="status">${this.cleanupNotice}</p>` : nothing}
       ${this.cleanupFindings ? html`
@@ -533,7 +543,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         ${this.cleanupFindings.length ? html`<ul>${this.cleanupFindings.map((finding) => html`<li><label>
           <input type="checkbox" aria-label=${`Select cleanup ${finding.id}`} ?disabled=${stale || this.cleanupBusy} .checked=${this.cleanupSelection.includes(finding.id)} @change=${(event: Event) => {
             this.cleanupSelection = (event.currentTarget as HTMLInputElement).checked ? [...this.cleanupSelection, finding.id] : this.cleanupSelection.filter((id) => id !== finding.id);
-          }} /> <code>${finding.value}</code> — ${finding.section}: ${finding.count} extra occurrence(s)
+          }} /> <code>${finding.value}</code> — ${finding.kind === "missing" ? "Missing from registry and current states; remove explicit references and metadata" : `${finding.section}: ${finding.count} extra occurrence(s)`}
         </label></li>`)}</ul>` : html`<p role="status">No cleanup findings.</p>`}
         <button type="button" aria-label="Stage selected cleanup" ?disabled=${stale || this.cleanupBusy || !this.cleanupSelection.length} @click=${this.stageCleanup}>Stage selected cleanup</button>
       ` : nothing}
@@ -650,12 +660,11 @@ export class AlexaExposureManagerPanel extends LitElement {
     `;
   }
 
-  private stageRemove(entity: AlexaEntity) {
-    const staged = { ...this.staged };
-    staged[entity.entityId] = { ...this.draftFrom(entity), remove: true, exposed: false };
-    this.staged = staged;
-    this.saveError = "";
-    this.validationIssues = [];
+  private async stageRemove(entity: AlexaEntity) {
+    this.section = "settings";
+    await this.checkCleanup(["missing"]);
+    const id = `missing:${entity.entityId}`;
+    if (this.cleanupFindings?.some((item) => item.id === id)) this.cleanupSelection = [id];
   }
 
   private async useRules(entity: AlexaEntity) {
@@ -727,6 +736,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       };
       this.baseExposeNewEntities = this.exposeNewEntities;
       this.staged = {};
+      this.cleanupMissing = [];
       if (this.rulesDraft) {
         this.rulesDraft = undefined;
         await this.load();
@@ -762,6 +772,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     return {
       type,
       expected_revision: this.status?.revision ?? "",
+      ...(this.cleanupMissing.length ? { cleanup_missing: this.cleanupMissing } : {}),
       expected_entities_revision: this.entitiesResponse?.entities_revision ?? this.status?.entities_revision ?? "",
       expose_new_entities: this.exposeNewEntities,
       entities: this.entityUpdates(),

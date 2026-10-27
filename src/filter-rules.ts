@@ -11,6 +11,7 @@ export type NativeFilter = Partial<Record<typeof filterSections[number][0], stri
 
 export interface DraftPreview {
   cleanup_findings?: CleanupFinding[];
+  cleanup_missing?: string[];
   filter?: NativeFilter;
   strategy?: string;
   exposure?: Record<string, boolean>;

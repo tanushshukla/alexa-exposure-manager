@@ -137,6 +137,30 @@ afterEach(() => {
 });
 
 describe("alexa-exposure-manager-panel", () => {
+  it("checks missing references and stages removal with save-time inventory protection", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = {
+      filter: {}, cleanup_findings: [{ id: "missing:light.gone", kind: "missing", value: "light.gone", count: 1 }],
+      cleanup_missing: ["light.gone"],
+    };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Check missing references"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLInputElement>('[aria-label="Select cleanup missing:light.gone"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Stage selected cleanup"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith(expect.objectContaining({
+      type: "alexa_exposure_manager/save", cleanup_missing: ["light.gone"],
+      entities: expect.arrayContaining([expect.objectContaining({ entity_id: "light.gone", remove: true })]),
+    }));
+  });
+
   it("selects duplicate cleanup findings and stages them without saving", async () => {
     const responses = configuredResponses();
     responses["alexa_exposure_manager/preview"] = {

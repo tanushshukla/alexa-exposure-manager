@@ -162,6 +162,8 @@ uses semantic versioning once releases are published.
 [0.1.0]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.0
 # Unreleased
 
+- Selectively remove missing explicit references and metadata; preserve registered/state-only entities and recheck inventory during save with rollback if an entity reappears (#62).
+
 - Preview and selectively stage exact duplicate rule cleanup, keeping first occurrences and overlapping rules (#61).
 
 - Explain native exposure decisions and remove explicit exceptions with Use rules without deleting metadata (#60).

@@ -327,4 +327,42 @@ def entity_catalog(hass, entity_config: Mapping[str, Any]) -> list[dict[str, Any
                 "missing": False,
             }
         )
+    state_ids = {entity["entity_id"] for entity in entities}
+    for entry in entity_registry.entities.values():
+        if entry.entity_id in state_ids:
+            continue
+        entities.append(
+            {
+                "entity_id": entry.entity_id,
+                "name": entry.name or entry.original_name or entry.entity_id,
+                "domain": entry.domain,
+                "state": "unavailable",
+                "available": False,
+                "icon": entry.icon or entry.original_icon,
+                "device_name": None,
+                "area_name": None,
+                "integration": entry.platform,
+                "supported": False,
+                "unsupported_reason": "No current state (registered entity)",
+                "display_categories": [],
+                "inferred_display_category": None,
+                "missing": False,
+                "default_exposed": not bool(entry.entity_category or entry.hidden_by),
+            }
+        )
     return sorted(entities, key=lambda item: item["entity_id"])
+
+
+def reliable_entity_inventory(hass) -> set[str]:
+    """Return registry plus states only after HA's startup has completed."""
+    from homeassistant.core import CoreState
+    from homeassistant.helpers import entity_registry as er
+
+    from .managed_files import InvalidManagedConfigurationError
+
+    if hass.state is not CoreState.running:
+        raise InvalidManagedConfigurationError(
+            "Entity inventory is not reliable until Home Assistant is running"
+        )
+    registry = er.async_get(hass)
+    return set(registry.entities) | set(hass.states.async_entity_ids())

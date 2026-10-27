@@ -378,19 +378,51 @@ class AlexaExposureManagerRuntime:
                 else []
             )
             selected = message.get("cleanup_selected", [])
+            if "missing" in message["cleanup_checks"]:
+                inventory = compatibility.reliable_entity_inventory(self.hass)
+                references = set(preview["entity_config"]) | {
+                    entity_id
+                    for section in ("include_entities", "exclude_entities")
+                    for entity_id in preview["filter"].get(section, [])
+                }
+                findings.extend(
+                    {
+                        "id": f"missing:{entity_id}",
+                        "kind": "missing",
+                        "value": entity_id,
+                        "count": 1,
+                    }
+                    for entity_id in sorted(references - inventory)
+                )
             if set(selected) - {item["id"] for item in findings}:
                 raise InvalidManagedConfigurationError(
                     "Cleanup selection is stale; run checks again"
                 )
             if selected:
+                missing = [
+                    item["value"]
+                    for item in findings
+                    if item["kind"] == "missing" and item["id"] in selected
+                ]
+                updates = [
+                    change
+                    for change in message.get("entities", [])
+                    if change["entity_id"] not in missing
+                ]
+                updates.extend(
+                    {"entity_id": entity_id, "remove": True} for entity_id in missing
+                )
                 preview = await self.transaction.async_preview(
                     expose_new_entities=message["expose_new_entities"],
-                    entities=message.get("entities", []),
+                    entities=updates,
                     known_entity_ids=known_ids,
                     filter_config=apply_duplicates(
-                        preview["filter"], findings, selected
+                        preview["filter"],
+                        [item for item in findings if item["kind"] == "duplicate"],
+                        selected,
                     ),
                 )
+                preview["cleanup_missing"] = missing
             preview["cleanup_findings"] = findings
         # Empty native filters defer to Alexa registry defaults, not include-all.
         for entity in catalog["entities"]:
@@ -458,6 +490,21 @@ class AlexaExposureManagerRuntime:
         known_ids = {
             entity_id for entity_id, entity in catalog.items() if not entity["missing"]
         }
+        missing_cleanup = set(message.get("cleanup_missing", [])) | {
+            change["entity_id"]
+            for change in message.get("entities", [])
+            if change.get("remove")
+        }
+
+        def validate_missing() -> None:
+            inventory = compatibility.reliable_entity_inventory(self.hass)
+            if inventory & missing_cleanup:
+                raise InvalidManagedConfigurationError(
+                    "An entity selected for cleanup reappeared; run checks again"
+                )
+
+        if missing_cleanup:
+            validate_missing()
         result = await self.transaction.async_save(
             expected_revision=message["expected_revision"],
             expected_entities_revision=message["expected_entities_revision"],
@@ -465,6 +512,7 @@ class AlexaExposureManagerRuntime:
             entities=message.get("entities", []),
             known_entity_ids=known_ids,
             filter_config=message.get("filter_config"),
+            pre_commit=validate_missing if missing_cleanup else None,
         )
         await self._record_restart_required(result)
         return result
