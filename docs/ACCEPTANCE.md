@@ -19,6 +19,22 @@ Assistant onboarding, or call Amazon APIs.
 
 ## Native Filters and Cleanup Acceptance — 2026-10-27
 
+### 0.1.9 shared review follow-up
+
+Repeated the disposable HA **2026.8.1** headless Chromium acceptance with the
+rebuilt 0.1.9 bundle. Rules, Use rules, and selected cleanup now all use the top
+**Preview changes** action and Save inside the shared modal. Each save closed
+the modal and produced the expected managed YAML; paired restore still passed.
+A deliberately failed preview followed by keyboard Retry, Escape, and re-preview
+verified focus remains in the modal through async retry and edits survive close.
+Mobile width remained `390px` with no horizontal overflow; no page JavaScript
+errors were reported. Home Assistant's full configuration check passed.
+
+49 rendered frontend tests and 92 backend tests passed locally, including stale
+preview rejection/retry, all three entry sections, metadata/rule/cleanup summaries,
+keyboard containment, validation/save failures, and save/restore editing locks.
+No Amazon/AWS or production configuration was accessed.
+
 The #59–#65 branch was exercised against disposable Home Assistant **2026.8.1**
 on port `18123`, using the production integration and rebuilt frontend. Normal
 onboarding and the integration config flow were completed; the managed includes

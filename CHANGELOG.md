@@ -5,6 +5,18 @@ uses semantic versioning once releases are published.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-10-27
+
+### Fixed
+
+- Replace the top-level Save with **Preview changes** across Entities, Filter
+  rules, and Settings. One modal reviews the full shared draft, including
+  exposure, rules, metadata, cleanup, and resulting managed YAML.
+- Offer Save only inside a successful current review; stale or failed previews
+  cannot authorize saving. Back to editing and Escape preserve staged edits.
+- Keep preview retry usable when an in-flight preview is invalidated by edits,
+  and contain keyboard focus within the review modal.
+
 ## [0.1.8] - 2026-10-27
 
 ### Added
@@ -175,7 +187,8 @@ uses semantic versioning once releases are published.
 - Home Assistant `2026.8.1` with
   `pytest-homeassistant-custom-component==0.13.355`.
 
-[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/tanushshukla/alexa-exposure-manager/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.9
 [0.1.8]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.8
 [0.1.7]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.7
 [0.1.6]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.6

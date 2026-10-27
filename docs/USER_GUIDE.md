@@ -278,6 +278,16 @@ missing entity merely because the mode changed.
 
 All browser edits are staged until you select **Save changes**.
 
+Select **Preview changes** at the top of **Entities**, **Filter rules**, or
+**Settings** to open the same review modal for the entire shared draft. It shows
+newly exposed/hidden entities, rule additions/removals, metadata edits, cleanup
+removals, and expandable resulting managed YAML. Preview writes nothing.
+
+**Save changes** appears only inside this modal after a successful current
+preview. **Back to editing** or Escape closes it without losing edits. Further
+edits require a fresh preview; preview failures offer **Retry preview** rather
+than Save. **Discard changes** abandons the shared draft from the editor.
+
 On save, the integration:
 
 1. Verifies the expected revision of both managed files.
@@ -329,7 +339,7 @@ uses Home Assistant's native precedence rather than treating exclusions as
 unconditionally stronger than inclusions. An explicit include can override a
 domain or glob exclusion.
 
-Select **Preview exposure changes** to review newly exposed/hidden entities and
+Select **Preview changes** to review newly exposed/hidden entities and
 future-entity behavior before saving. Changing the draft invalidates the preview;
 preview it again before Save. Removing all include and exclude rules restores
 Alexa's registry-default behavior, not a deny-all list. The simple **Expose new
@@ -536,7 +546,7 @@ entities, domains, and entity glob patterns. Existing managed rules load directl
 there is no second rules store and glob patterns are not regular expressions.
 Use one value per line. Exact entity IDs are valid in glob lists too.
 
-Choose **Preview exposure changes** to review newly exposed and hidden entities
+Choose **Preview changes** to review newly exposed and hidden entities
 before saving a rule draft. Home Assistant's native precedence applies: explicit
 entity exceptions can override domain/glob rules. Future entities follow those
 rules, so the current-entity preview cannot enumerate future matches. Removing

@@ -33,6 +33,11 @@ async function settle(panel: HTMLElement & { updateComplete: Promise<boolean> })
   await panel.updateComplete;
 }
 
+async function openReview(panel: Awaited<ReturnType<typeof createPanel>>) {
+  panel.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]')!.click();
+  await settle(panel);
+}
+
 function configuredResponses(): Record<string, unknown> {
   return {
     "alexa_exposure_manager/status": {
@@ -137,6 +142,128 @@ afterEach(() => {
 });
 
 describe("alexa-exposure-manager-panel", () => {
+  it.each(["Entities", "Filter rules", "Settings"])("reviews the shared draft in a modal from %s before saving", async (section) => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = {
+      impact: { exposed: [], hidden: ["light.kitchen_ceiling"] },
+      filter_yaml: "include_entities: []", entity_config_yaml: "{}",
+      future_behavior: "New entities remain hidden",
+    };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Hide Kitchen ceiling"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>(`[aria-label="${section}"]`)!.click();
+    await settle(panel);
+    expect(root.querySelector('[aria-label="Save changes"]')).toBeNull();
+    const trigger = root.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]');
+    expect(trigger).not.toBeNull();
+    trigger!.focus(); trigger!.click();
+    await settle(panel);
+    const modal = root.querySelector<HTMLElement>('[role="dialog"][aria-labelledby="draft-preview-title"]')!;
+    expect(modal).not.toBeNull();
+    expect(modal.textContent).toContain("light.kitchen_ceiling");
+    expect(modal.textContent).toContain("include_entities: []");
+    expect(panel.hass.connection.sendMessagePromise).not.toHaveBeenCalledWith(expect.objectContaining({type:"alexa_exposure_manager/save"}));
+    modal.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith(expect.objectContaining({type:"alexa_exposure_manager/save"}));
+    expect(root.querySelector('[aria-labelledby="draft-preview-title"]')).toBeNull();
+  });
+
+  it("keeps preview failures and retry in the modal without offering Save", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = new Error("Inventory unavailable");
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Hide Kitchen ceiling"]')!.click();
+    await settle(panel);
+    const trigger = root.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]');
+    expect(trigger).not.toBeNull(); trigger!.focus(); trigger!.click();
+    await settle(panel);
+    const modal = root.querySelector<HTMLElement>('[aria-labelledby="draft-preview-title"]')!;
+    expect(modal.textContent).toContain("Inventory unavailable");
+    expect(modal.querySelector('[aria-label="Save changes"]')).toBeNull();
+    expect(modal.querySelector('[aria-label="Retry preview"]')).not.toBeNull();
+    modal.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}));
+    await settle(panel);
+    expect(root.activeElement).toBe(trigger);
+    expect(root.textContent).toContain("1 pending change");
+  });
+
+  it("keeps review focus inside the modal and requires a fresh preview after more edits", async () => {
+    const panel = await createPanel(configuredResponses());
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Hide Kitchen ceiling"]')!.click();
+    await settle(panel);
+    await openReview(panel);
+    const back = root.querySelector<HTMLButtonElement>('[aria-label="Back to editing"]')!;
+    expect(root.querySelector('.manager')!.hasAttribute("inert")).toBe(true);
+    const save = root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!;
+    save.focus();
+    save.dispatchEvent(new KeyboardEvent("keydown", {key:"Tab", bubbles:true, cancelable:true}));
+    expect(root.activeElement).toBe(root.querySelector(".draft-review summary"));
+    const summary = root.querySelector<HTMLElement>(".draft-review summary")!;
+    summary.dispatchEvent(new KeyboardEvent("keydown", {key:"Tab", shiftKey:true, bubbles:true, cancelable:true}));
+    expect(root.activeElement).toBe(save);
+    back.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Expose Bedroom fan"]')!.click();
+    await settle(panel);
+    expect(root.querySelector('[aria-label="Save changes"]')).toBeNull();
+    await openReview(panel);
+    expect(panel.hass.connection.sendMessagePromise.mock.calls.filter(([m]) => m.type === "alexa_exposure_manager/preview")).toHaveLength(2);
+    expect(root.querySelector('[aria-label="Save changes"]')).not.toBeNull();
+  });
+
+  it("returns keyboard focus to the review after a retry replaces its focused button", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = new Error("Try again");
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Hide Kitchen ceiling"]')!.click();
+    await settle(panel);
+    await openReview(panel);
+    const retry = root.querySelector<HTMLButtonElement>('[aria-label="Retry preview"]')!;
+    retry.focus();
+    responses["alexa_exposure_manager/preview"] = {impact:{exposed:[],hidden:[]}};
+    retry.click();
+    await settle(panel);
+    expect(root.querySelector('.draft-review')!.contains(root.activeElement)).toBe(true);
+  });
+
+  it("summarizes metadata, duplicate removals and native rule order in the shared review", async () => {
+    const responses = configuredResponses();
+    Object.assign(responses["alexa_exposure_manager/entities"] as object, {
+      filter: {include_domains:["light","light","fan"], exclude_domains:["sensor","automation"]},
+    });
+    responses["alexa_exposure_manager/preview"] = {
+      filter: {include_domains:["light","fan"], exclude_domains:["automation","sensor"]},
+      impact: {exposed:[], hidden:[]},
+    };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Edit Alexa metadata for Kitchen ceiling"]')!.click();
+    await settle(panel);
+    const name = root.querySelector<HTMLInputElement>('[aria-label="Alexa name"]')!;
+    name.value = "New kitchen name";
+    name.dispatchEvent(new Event("input",{bubbles:true}));
+    root.querySelector<HTMLButtonElement>('[aria-label="Apply Alexa metadata"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    const domains = root.querySelector<HTMLTextAreaElement>('[data-filter-key="include_domains"]')!;
+    domains.value = "light\nfan";
+    domains.dispatchEvent(new Event("input",{bubbles:true}));
+    await settle(panel);
+    await openReview(panel);
+    const modal = root.querySelector<HTMLElement>(".draft-review")!;
+    expect(modal.textContent).toContain("Alexa name: (default) → New kitchen name");
+    expect(modal.textContent).toContain("Removed");
+    expect(modal.textContent).toContain("Rule order changed");
+    expect(modal.textContent).toContain("0 newly exposed · 0 newly hidden");
+  });
+
   it("replaces Use rules with explicit intent for a subsequent bulk action", async () => {
     const panel = await createPanel(configuredResponses());
     const root = panel.shadowRoot!;
@@ -150,7 +277,7 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
     root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
     await settle(panel);
-    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]')!.click();
     await settle(panel);
     const request = panel.hass.connection.sendMessagePromise.mock.calls.at(-1)![0];
     expect(request.entities).toEqual([expect.objectContaining({entity_id:"light.kitchen_ceiling", exposed:false})]);
@@ -185,6 +312,7 @@ describe("alexa-exposure-manager-panel", () => {
     if (operation === "save") {
       root.querySelector<HTMLButtonElement>('[aria-label="Hide Kitchen ceiling"]')!.click();
       await settle(panel);
+      await openReview(panel);
     } else {
       root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
       await settle(panel);
@@ -203,7 +331,7 @@ describe("alexa-exposure-manager-panel", () => {
     root.querySelector<HTMLButtonElement>('[aria-label="Expose Bedroom fan"]')!.click();
     resolve({revision: "config-r5", restart_required: true});
     await settle(panel);
-    expect(root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]')!.disabled).toBe(true);
   });
 
   it.each([
@@ -220,7 +348,9 @@ describe("alexa-exposure-manager-panel", () => {
     field.value = "fan";
     field.dispatchEvent(new Event("input", { bubbles: true }));
     await settle(panel);
-    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Back to editing"]')!.click();
     await settle(panel);
     root.querySelector<HTMLButtonElement>('[aria-label="Entities"]')!.click();
     await settle(panel);
@@ -228,7 +358,7 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
     root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
     await settle(panel);
-    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]')!.click();
     await settle(panel);
     expect(panel.hass.connection.sendMessagePromise.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({
       entities: expect.arrayContaining([expect.objectContaining({ entity_id: id, exposed: requested })]),
@@ -244,6 +374,7 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
     const catalog = responses["alexa_exposure_manager/entities"] as {entities: Record<string, unknown>[]};
     responses["alexa_exposure_manager/entities"] = {...catalog, filter: {include_entities: ["lock.front_door"]}, entities: catalog.entities.map(e=>({...e, exposed: e.entity_id === "light.kitchen_ceiling" ? false : e.exposed, exposure_reason: "Not matched by include rules"}))};
+    await openReview(panel);
     root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.click();
     await settle(panel);
     expect(root.textContent).toContain("Not matched by include rules");
@@ -282,17 +413,22 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
     let resolve!: (value: unknown) => void;
     panel.hass.connection.sendMessagePromise.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
-    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]')!.click();
+    await settle(panel);
     field.value = "fan";
     field.dispatchEvent(new Event("input", { bubbles: true }));
     await settle(panel);
     resolve({ impact: { exposed: ["light.stale"], hidden: [] } });
     await settle(panel);
     expect(root.textContent).not.toContain("light.stale");
-    root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.click();
-    await settle(panel);
-    expect(root.textContent).toContain("Preview required");
+    expect(root.querySelector('[aria-label="Save changes"]')).toBeNull();
+    expect(root.textContent).toContain("Preview is out of date");
     expect(panel.hass.connection.sendMessagePromise).not.toHaveBeenCalledWith(expect.objectContaining({ type: "alexa_exposure_manager/save" }));
+    const retry = root.querySelector<HTMLButtonElement>('[aria-label="Retry preview"]')!;
+    expect(retry.disabled).toBe(false);
+    retry.click();
+    await settle(panel);
+    expect(root.querySelector('[aria-label="Save changes"]')).not.toBeNull();
   });
 
   it("preserves a simple mode change when rule editing starts", async () => {
@@ -377,6 +513,8 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
     root.querySelector<HTMLButtonElement>('[aria-label="Stage selected cleanup"]')!.click();
     await settle(panel);
+    await openReview(panel);
+    expect(root.querySelector('.draft-review')!.textContent).toContain("missing-reference cleanup");
     root.querySelector<HTMLButtonElement>('[aria-label="Save changes"]')!.click();
     await settle(panel);
     expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith(expect.objectContaining({
@@ -454,8 +592,8 @@ describe("alexa-exposure-manager-panel", () => {
     field.value = "light\nfan";
     field.dispatchEvent(new Event("input", { bubbles: true }));
     await settle(panel);
-    expect(root.textContent).toContain("Preview required");
-    root.querySelector<HTMLButtonElement>('[aria-label="Preview exposure changes"]')!.click();
+    expect(root.querySelector('[aria-label="Save changes"]')).toBeNull();
+    root.querySelector<HTMLButtonElement>('[aria-label="Preview changes"]')!.click();
     await settle(panel);
     expect(root.textContent).toContain("fan.bedroom");
     expect(root.textContent).toContain("1 newly exposed");
@@ -777,6 +915,7 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
     expect(root.textContent).toContain("1 pending change");
 
+    await openReview(panel);
     root.querySelector<HTMLButtonElement>("[aria-label='Save changes']")!.click();
     await settle(panel);
 
@@ -829,6 +968,8 @@ describe("alexa-exposure-manager-panel", () => {
     await settle(panel);
 
     expect(root.textContent).toContain("3 pending changes");
+    await openReview(panel);
+    expect(root.querySelector('.draft-review')!.textContent).toContain("Expose new entities automatically: Off → On");
     root.querySelector<HTMLButtonElement>("[aria-label='Save changes']")!.click();
     await settle(panel);
 
@@ -925,7 +1066,7 @@ describe("alexa-exposure-manager-panel", () => {
     const main = root.querySelector("main")!;
     expect(main.classList.contains("narrow")).toBe(true);
     expect(root.querySelector("[aria-label='Entity search']")).not.toBeNull();
-    expect(root.querySelector("[aria-label='Save changes']")).not.toBeNull();
+    expect(root.querySelector("[aria-label='Preview changes']")).not.toBeNull();
     expect(root.textContent).toContain("Kitchen ceiling");
     expect(root.textContent).toContain("This domain is not supported by Alexa");
 
@@ -995,6 +1136,7 @@ describe("alexa-exposure-manager-panel", () => {
     root.querySelector<HTMLButtonElement>("[aria-label='Apply Alexa metadata']")!.click();
     await settle(panel);
 
+    await openReview(panel);
     root.querySelector<HTMLButtonElement>("[aria-label='Save changes']")!.click();
     await settle(panel);
     expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith({
@@ -1198,10 +1340,12 @@ describe("alexa-exposure-manager-panel", () => {
     const validationPanel = await createPanel(validationResponses);
     validationPanel.shadowRoot!.querySelector<HTMLButtonElement>("[aria-label='Hide Kitchen ceiling']")!.click();
     await settle(validationPanel);
+    await openReview(validationPanel);
     validationPanel.shadowRoot!.querySelector<HTMLButtonElement>("[aria-label='Save changes']")!.click();
     await settle(validationPanel);
     expect(validationPanel.shadowRoot!.textContent).toContain("Alexa name is too long");
     expect(validationPanel.shadowRoot!.textContent).toContain("1 pending change");
+    expect(validationPanel.shadowRoot!.querySelector('.draft-review')!.textContent).toContain("Alexa name is too long");
 
     document.body.replaceChildren();
     const conflictResponses = configuredResponses();
@@ -1209,9 +1353,11 @@ describe("alexa-exposure-manager-panel", () => {
     const conflictPanel = await createPanel(conflictResponses);
     conflictPanel.shadowRoot!.querySelector<HTMLButtonElement>("[aria-label='Hide Kitchen ceiling']")!.click();
     await settle(conflictPanel);
+    await openReview(conflictPanel);
     conflictPanel.shadowRoot!.querySelector<HTMLButtonElement>("[aria-label='Save changes']")!.click();
     await settle(conflictPanel);
     expect(conflictPanel.shadowRoot!.textContent).toContain("Configuration changed elsewhere");
     expect(conflictPanel.shadowRoot!.textContent).toContain("Reload the panel before saving again");
+    expect(conflictPanel.shadowRoot!.querySelector('.draft-review')!.textContent).toContain("Configuration changed elsewhere");
   });
 });

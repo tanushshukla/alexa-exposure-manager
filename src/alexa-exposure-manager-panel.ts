@@ -56,6 +56,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     rulesDraft: { state: true },
     draftPreview: { state: true },
     previewLoading: { state: true },
+    reviewOpen: { state: true },
     cleanupFindings: { state: true },
     cleanupSelection: { state: true },
     cleanupBusy: { state: true },
@@ -105,6 +106,7 @@ export class AlexaExposureManagerPanel extends LitElement {
   declare private rulesDraft?: NativeFilter;
   declare private draftPreview?: DraftPreview;
   declare private previewLoading: boolean;
+  declare private reviewOpen: boolean;
   private previewFingerprint = "";
   private previewSequence = 0;
   declare private cleanupFindings?: CleanupFinding[];
@@ -146,6 +148,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.candidateWindowStart = 0;
     this.section = "entities";
     this.previewLoading = false;
+    this.reviewOpen = false;
     this.cleanupSelection = [];
     this.cleanupBusy = false;
     this.cleanupNotice = "";
@@ -156,6 +159,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       this.draftPreview = undefined;
       this.previewFingerprint = "";
       this.previewSequence++;
+      this.previewLoading = false;
       this.previewResponse = undefined;
     }
     if (
@@ -182,6 +186,22 @@ export class AlexaExposureManagerPanel extends LitElement {
       (changed.has("confirmation") && changed.get("confirmation") && !this.confirmation) ||
       (changed.has("bulkConfirmOpen") && changed.get("bulkConfirmOpen") && !this.bulkConfirmOpen);
     if (closedConfirmation) queueMicrotask(() => this.dialogTrigger?.focus());
+    if (changed.has("reviewOpen")) {
+      if (this.reviewOpen) {
+        const active = (this.renderRoot as ShadowRoot).activeElement;
+        if (active instanceof HTMLElement) this.dialogTrigger = active;
+        queueMicrotask(() => this.renderRoot.querySelector<HTMLButtonElement>('[aria-label="Back to editing"]')?.focus());
+      } else if (changed.get("reviewOpen")) {
+        queueMicrotask(() => this.dialogTrigger?.focus());
+      }
+    }
+    if (this.reviewOpen && (changed.has("previewLoading") || changed.has("saving"))) {
+      const dialog = this.renderRoot.querySelector<HTMLElement>(".draft-review");
+      const active = (this.renderRoot as ShadowRoot).activeElement;
+      if (!dialog?.contains(active) || active?.matches(":disabled")) {
+        (dialog?.querySelector<HTMLElement>("footer button:not(:disabled)") ?? dialog)?.focus();
+      }
+    }
   }
 
   private async load() {
@@ -233,6 +253,7 @@ export class AlexaExposureManagerPanel extends LitElement {
         ${this.bulkConfirmOpen ? this.renderBulkConfirmation() : nothing}
         ${this.metadataEntityId && this.metadataDraft ? this.renderMetadataDialog() : nothing}
         ${this.confirmation ? this.renderOperationConfirmation() : nothing}
+        ${this.reviewOpen ? this.renderDraftReview() : nothing}
       </main>
     `;
   }
@@ -344,7 +365,7 @@ export class AlexaExposureManagerPanel extends LitElement {
     });
 
     return html`
-      <div class="manager">
+      <div class="manager" ?inert=${this.reviewOpen}>
         <header class="page-header">
           <div>
             <span class="eyebrow">${t("headerEyebrow")}</span>
@@ -359,10 +380,10 @@ export class AlexaExposureManagerPanel extends LitElement {
               : nothing}
             <button
               type="button"
-              aria-label=${t("save")}
-              ?disabled=${this.pendingCount === 0 || this.saving || !this.editingEnabled}
-              @click=${this.save}
-            >${this.saving ? t("saving") : t("save")}</button>
+              aria-label="Preview changes"
+              ?disabled=${this.pendingCount === 0 || this.saving || this.previewLoading || !this.editingEnabled}
+              @click=${this.openDraftReview}
+            >${this.previewLoading ? "Loading preview…" : "Preview changes"}</button>
           </div>
         </header>
 
@@ -580,6 +601,8 @@ export class AlexaExposureManagerPanel extends LitElement {
     const fingerprint = this.draftFingerprint();
     const sequence = ++this.previewSequence;
     this.previewLoading = true;
+    this.draftPreview = undefined;
+    this.previewFingerprint = "";
     this.saveError = "";
     try {
       const preview = await this.hass.connection.sendMessagePromise<DraftPreview>(this.previewMessage());
@@ -589,14 +612,96 @@ export class AlexaExposureManagerPanel extends LitElement {
     } catch (error) {
       if (sequence === this.previewSequence) this.saveError = this.errorMessage(error);
     } finally {
-      this.previewLoading = false;
+      if (sequence === this.previewSequence) this.previewLoading = false;
     }
+  }
+
+  private async openDraftReview(event?: Event) {
+    if (!this.pendingCount || !this.editingEnabled) return;
+    if (event?.currentTarget instanceof HTMLElement) this.dialogTrigger = event.currentTarget;
+    this.reviewOpen = true;
+    await this.updateComplete;
+    await this.previewDraft();
+  }
+
+  private closeDraftReview() {
+    if (this.saving) return;
+    this.reviewOpen = false;
+  }
+
+  private renderDraftReview() {
+    const current = this.draftPreview && this.previewFingerprint === this.draftFingerprint();
+    const preview = current ? this.draftPreview : undefined;
+    const impact = preview?.impact;
+    const previous = this.entitiesResponse?.filter ?? {};
+    const next = preview?.filter ?? this.rulesDraft ?? previous;
+    const extraValues = (values: string[], baseline: string[]) => {
+      const remaining = [...baseline];
+      return values.filter(value => {
+        const index = remaining.indexOf(value);
+        if (index < 0) return true;
+        remaining.splice(index, 1);
+        return false;
+      });
+    };
+    return html`<div class="dialog-backdrop"><section class="dialog draft-review" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="draft-preview-title"
+      @keydown=${(event: KeyboardEvent) => {
+        if (event.key === "Escape") { event.preventDefault(); this.closeDraftReview(); }
+        if (event.key === "Tab") {
+          const controls = (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('button:not(:disabled), summary');
+          const first = controls[0]; const last = controls[controls.length - 1];
+          const active = (this.renderRoot as ShadowRoot).activeElement;
+          if (event.shiftKey && active === first) { event.preventDefault(); last?.focus(); }
+          else if (!event.shiftKey && active === last) { event.preventDefault(); first?.focus(); }
+          else if (!controls.length) event.preventDefault();
+        }
+      }}>
+      <header><h2 id="draft-preview-title">Preview changes</h2><p>Review all pending edits across Entities, Filter rules and Settings. Nothing is written until you Save changes.</p></header>
+      <div class="review-body" aria-busy=${String(this.previewLoading || this.saving)}>
+        ${this.previewLoading ? html`<p role="status">Loading preview…</p>` : nothing}
+        ${this.saveError ? html`<p role="alert">${this.saveError}</p>` : nothing}
+        ${this.validationIssues.length ? html`<div role="alert">${this.validationIssues.map(issue => html`<p>${issue.message}</p>`)}</div>` : nothing}
+        ${preview ? html`
+          <h3>Exposure changes</h3>
+          <p>${impact?.exposed.length ?? 0} newly exposed · ${impact?.hidden.length ?? 0} newly hidden</p>
+          <h4>Newly exposed</h4><ul>${(impact?.exposed ?? []).map(id => html`<li><code>${id}</code></li>`)}</ul>
+          <h4>Newly hidden</h4><ul>${(impact?.hidden ?? []).map(id => html`<li><code>${id}</code></li>`)}</ul>
+          <p>${preview.future_behavior}</p>
+          <h3>Rule changes</h3>
+          ${filterSections.map(([key, label]) => {
+            const before = previous[key] ?? []; const after = next[key] ?? [];
+            if (JSON.stringify(before) === JSON.stringify(after)) return nothing;
+            const added = extraValues(after, before); const removed = extraValues(before, after);
+            return html`<section><h4>${label}</h4>
+              ${added.length ? html`<p>Added</p><ul>${added.map(value => html`<li><code>${value}</code></li>`)}</ul>` : nothing}
+              ${removed.length ? html`<p>Removed</p><ul>${removed.map(value => html`<li><code>${value}</code></li>`)}</ul>` : nothing}
+              ${!added.length && !removed.length ? html`<p>Rule order changed.</p>` : nothing}
+            </section>`;
+          })}
+          ${this.exposeNewEntities !== this.baseExposeNewEntities ? html`<p>Expose new entities automatically: ${this.baseExposeNewEntities ? "On" : "Off"} → ${this.exposeNewEntities ? "On" : "Off"}</p>` : nothing}
+          ${Object.keys(this.staged).length ? html`<h3>Entity edits and cleanup</h3><ul>${Object.entries(this.staged).map(([id, draft]) => {
+            const entity = this.normalizedEntities.find(item => item.entityId === id);
+            return html`<li><code>${id}</code>
+              ${draft.remove ? html`<p>Remove explicit references and Alexa metadata${this.cleanupMissing.includes(id) ? " (missing-reference cleanup)" : ""}.</p>` : html`
+                ${draft.useRules ? html`<p>Use rules: remove individual include/exclude overrides.</p>` : draft.exposureChanged || !this.rulesDraft ? html`<p>${draft.exposed ? "Explicitly expose" : "Explicitly hide"}.</p>` : nothing}
+                ${draft.name !== entity?.alexaName ? html`<p>Alexa name: ${entity?.alexaName || "(default)"} → ${draft.name || "(default)"}</p>` : nothing}
+                ${draft.description !== entity?.description ? html`<p>Description: ${entity?.description || "(none)"} → ${draft.description || "(none)"}</p>` : nothing}
+                ${draft.displayCategories.join() !== entity?.displayCategories.join() ? html`<p>Category: ${entity?.displayCategories.join() || "(default)"} → ${draft.displayCategories.join() || "(default)"}</p>` : nothing}
+              `}
+            </li>`;
+          })}</ul>` : nothing}
+          <details><summary>Resulting managed YAML</summary><h4>alexa_exposure_filter.yaml</h4><pre>${preview.filter_yaml}</pre><h4>alexa_entity_config.yaml</h4><pre>${preview.entity_config_yaml}</pre></details>
+        ` : !this.previewLoading && !this.saveError ? html`<p role="status">Preview is out of date. Preview again before saving.</p>` : nothing}
+      </div>
+      <footer><button type="button" class="secondary" aria-label="Back to editing" ?disabled=${this.saving} @click=${this.closeDraftReview}>Back to editing</button>
+        ${current && !this.previewLoading ? html`<button type="button" aria-label=${t("save")} ?disabled=${this.saving || !this.editingEnabled} @click=${this.save}>${this.saving ? t("saving") : t("save")}</button>` : html`<button type="button" aria-label="Retry preview" ?disabled=${this.previewLoading || this.saving} @click=${this.previewDraft}>Retry preview</button>`}
+      </footer>
+    </section></div>`;
   }
 
   private renderRules() {
     const rules = this.rulesDraft ?? this.entitiesResponse?.filter ?? {};
     const canEdit = !this.saving && !this.status?.read_only && this.isConfigured();
-    const impact = this.draftPreview?.impact;
     return html`<section class="workspace rules-editor" aria-label="Native filter rules">
       <h2>Filter rules</h2>
       <p>Home Assistant native filters. Enter one entity ID, domain, or glob pattern per line. Glob patterns are not regular expressions. Explicit entities, globs and domains use Home Assistant’s native precedence.</p>
@@ -612,16 +717,7 @@ export class AlexaExposureManagerPanel extends LitElement {
             this.rulesDraft = next;
           }}></textarea>
       </label>`)}</div>
-      <button type="button" aria-label="Preview exposure changes" ?disabled=${!canEdit || this.previewLoading} @click=${this.previewDraft}>${this.previewLoading ? "Loading preview…" : "Preview exposure changes"}</button>
-      ${this.rulesDraft && !this.draftPreview ? html`<p role="status">Preview required before saving rule changes.</p>` : nothing}
-      ${impact ? html`<section class="impact" role="status">
-        <strong>${impact.exposed.length} newly exposed · ${impact.hidden.length} newly hidden</strong>
-        <p>${this.draftPreview?.future_behavior}</p>
-        <details><summary>Review affected entities</summary>
-          <h3>Newly exposed</h3><ul>${impact.exposed.map((id) => html`<li><code>${id}</code></li>`)}</ul>
-          <h3>Newly hidden</h3><ul>${impact.hidden.map((id) => html`<li><code>${id}</code></li>`)}</ul>
-        </details>
-      </section>` : nothing}
+      <p>Use Preview changes at the top to review the complete draft before saving.</p>
     </section>`;
   }
 
@@ -718,7 +814,7 @@ export class AlexaExposureManagerPanel extends LitElement {
 
   private async save() {
     if (!this.hass || !this.pendingCount || !this.editingEnabled) return;
-    if (this.rulesDraft && this.previewFingerprint !== this.draftFingerprint()) {
+    if (!this.reviewOpen || !this.draftPreview || this.previewFingerprint !== this.draftFingerprint()) {
       this.saveError = "Preview required. Review exposure changes before saving filter rules.";
       return;
     }
@@ -737,6 +833,7 @@ export class AlexaExposureManagerPanel extends LitElement {
       this.status = { ...this.status, ...response };
       this.previewResponse = undefined;
       this.backupsResponse = undefined;
+      this.reviewOpen = false;
     } catch (error) {
       const message = this.errorMessage(error);
       const code = this.errorCode(error);
@@ -1583,6 +1680,12 @@ export class AlexaExposureManagerPanel extends LitElement {
     .dialog footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 16px 22px; }
     .dialog footer > span { margin-right: auto; color: var(--secondary-text-color, #616161); font-size: 12px; }
     .confirm-dialog { max-width: 510px; }
+    .draft-review { width: min(920px, 100%); }
+    .draft-review header { display: block; flex-shrink: 0; }
+    .draft-review header p { max-width: 75ch; }
+    .draft-review footer { flex-shrink: 0; border-top: 1px solid var(--divider-color, #e0e0e0); }
+    .review-body { padding: 0 24px 24px; overflow-y: auto; min-height: 0; overflow-wrap: anywhere; }
+    .review-body pre { white-space: pre-wrap; overflow-wrap: anywhere; }
     .metadata-dialog { max-width: 760px; }
     .metadata-content { overflow-y: auto; padding: 4px 22px 20px; }
     .field { display: block; margin-top: 16px; }
