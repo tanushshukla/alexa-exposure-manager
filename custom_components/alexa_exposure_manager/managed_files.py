@@ -1169,8 +1169,23 @@ class ManagedFileTransaction:
                 "healthy": healthy,
             }
             if healthy:
-                item["revision"] = self._revision(filter_path.read_bytes())
-                item["entities_revision"] = self._revision(entity_path.read_bytes())
+                try:
+                    parsed = self._parse_pair(
+                        filter_path.read_bytes(), entity_path.read_bytes()
+                    )
+                    item["healthy"] = not parsed.read_only_reasons
+                    item["health_reason"] = "; ".join(parsed.read_only_reasons)
+                    item["revision"] = parsed.revision
+                    item["entities_revision"] = parsed.entities_revision
+                except (
+                    OSError,
+                    UnicodeError,
+                    InvalidManagedConfigurationError,
+                ) as error:
+                    item["healthy"] = False
+                    item["health_reason"] = str(error)
+            else:
+                item["health_reason"] = "Incomplete backup pair"
             result.append(item)
         return result
 

@@ -137,6 +137,35 @@ afterEach(() => {
 });
 
 describe("alexa-exposure-manager-panel", () => {
+  it("shows recovery directly in Settings and blocks unhealthy or pending-edit restores", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/backups"] = { backups: [
+      { id: "good", timestamp: "20261026T120000.000000Z", healthy: true },
+      { id: "bad", healthy: false, health_reason: "Incomplete backup pair" },
+    ] };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
+    await settle(panel);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Restore backup bad"]')!.disabled).toBe(true);
+    expect(root.textContent).toContain("Incomplete backup pair");
+    root.querySelector<HTMLButtonElement>('[aria-label="Entities"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Hide Kitchen ceiling"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
+    await settle(panel);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Restore backup good"]')!.disabled).toBe(true);
+    expect(root.textContent).toContain("Save or Discard pending changes before restoring");
+    root.querySelector<HTMLButtonElement>('[aria-label="Discard changes"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Restore backup good"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Confirm restore"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise.mock.calls.filter(([msg]) => msg.type === "alexa_exposure_manager/entities").length).toBeGreaterThan(1);
+  });
+
   it("runs combined cleanup and invalidates findings after another draft edit", async () => {
     const responses = configuredResponses();
     responses["alexa_exposure_manager/preview"] = { cleanup_findings: [

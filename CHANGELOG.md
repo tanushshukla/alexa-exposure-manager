@@ -162,6 +162,8 @@ uses semantic versioning once releases are published.
 [0.1.0]: https://github.com/tanushshukla/alexa-exposure-manager/releases/tag/v0.1.0
 # Unreleased
 
+- Put recovery in Settings, report backup pair health and local timestamps, block restore until pending edits are saved/discarded, and reload the catalog after restore (#64).
+
 - Run both cleanup checks together, count overlapping entity findings once, and invalidate cleanup results when the shared draft changes (#63).
 
 - Selectively remove missing explicit references and metadata; preserve registered/state-only entities and recheck inventory during save with rollback if an entity reappears (#62).

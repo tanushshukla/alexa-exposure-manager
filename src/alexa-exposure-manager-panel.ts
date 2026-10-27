@@ -1137,6 +1137,12 @@ export class AlexaExposureManagerPanel extends LitElement {
   }
 
   private renderAdvanced() {
+    if (this.section === "settings") return html`<section aria-label="Recovery and diagnostics">
+      <h2>Recovery and diagnostics</h2>
+      ${this.advancedLoading ? html`<p role="status">${t("advancedLoading")}</p>` : nothing}
+      ${this.advancedError ? html`<p role="alert">${this.advancedError}</p>` : nothing}
+      ${this.renderAdvancedGrid()}
+    </section>`;
     return html`
       <section class="advanced">
         <button class="advanced-toggle" type="button" aria-label=${t("advancedTools")} aria-expanded=${String(this.advancedOpen)} @click=${this.toggleAdvanced}>
@@ -1189,10 +1195,11 @@ export class AlexaExposureManagerPanel extends LitElement {
         </section>
         <section class="advanced-card">
           <h3>${t("backupsTitle")}</h3><p>${t("backupsBody")}</p>
+          ${this.pendingCount ? html`<p role="status">Save or Discard pending changes before restoring a backup.</p>` : nothing}
           <div class="backup-list">
             ${backups.length ? backups.map((backup) => {
               const id = String(backup.id ?? backup.backup_id ?? "");
-              return html`<div><span><strong>${id}</strong><small>${String(backup.created_at ?? backup.created ?? backup.timestamp ?? "")} · ${String(backup.revision ?? "")}</small></span><button class="secondary" type="button" aria-label=${t("restoreBackup", { id })} @click=${() => { this.confirmationTarget = id; this.confirmation = "restore"; }}>${t("restoreBackup", { id })}</button></div>`;
+              return html`<div><span><strong>${id}</strong><small>${this.backupTimestamp(backup)} · ${backup.healthy === false ? "Unhealthy" : "Backup pair"}</small><small>${String(backup.health_reason ?? "")}</small></span><button class="secondary" type="button" aria-label=${t("restoreBackup", { id })} ?disabled=${backup.healthy === false || !!this.pendingCount || this.saving} @click=${() => { this.confirmationTarget = id; this.confirmation = "restore"; }}>${t("restoreBackup", { id })}</button></div>`;
             }) : html`<span class="muted">${t("noBackups")}</span>`}
           </div>
         </section>
@@ -1219,6 +1226,13 @@ export class AlexaExposureManagerPanel extends LitElement {
     if (validation.rollback === "failed") return t("validationStatusRollbackFailed", { at, error });
     if (validation.rollback === "complete") return t("validationStatusRolledBack", { at, error });
     return t("validationStatusFailed", { at, error });
+  }
+
+  private backupTimestamp(backup: Record<string, unknown>) {
+    const raw = String(backup.created_at ?? backup.created ?? backup.timestamp ?? "");
+    const iso = raw.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\.\d+)?Z$/, "$1-$2-$3T$4:$5:$6$7Z");
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? raw : date.toLocaleString();
   }
 
   private migrationStateLabel() {
@@ -1279,6 +1293,10 @@ export class AlexaExposureManagerPanel extends LitElement {
     this.closeOperationConfirmation();
     try {
       if (action === "restore") {
+        if (this.pendingCount || this.saving) {
+          this.advancedError = "Save or Discard pending changes before restoring a backup.";
+          return;
+        }
         const response = await this.hass.connection.sendMessagePromise<StatusResponse>({
           type: "alexa_exposure_manager/restore",
           backup_id: target ?? "",
@@ -1286,6 +1304,12 @@ export class AlexaExposureManagerPanel extends LitElement {
           expected_entities_revision: this.entitiesResponse?.entities_revision ?? this.status?.entities_revision ?? "",
         });
         this.status = { ...this.status, ...response };
+        this.discard();
+        this.previewResponse = undefined;
+        this.backupsResponse = undefined;
+        await this.load();
+        this.status = { ...this.status, ...response };
+        await this.loadAdvanced();
       } else if (action === "restart") {
         await this.hass.connection.sendMessagePromise({ type: "alexa_exposure_manager/restart", confirmed: true });
         this.operationMessage = t("restartRequested");

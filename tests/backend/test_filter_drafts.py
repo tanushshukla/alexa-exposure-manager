@@ -9,6 +9,7 @@ import yaml
 from custom_components.alexa_exposure_manager.managed_files import (
     InvalidManagedConfigurationError,
     ManagedFileTransaction,
+    ManagedYamlReadOnlyError,
     RevisionConflictError,
 )
 from custom_components.alexa_exposure_manager.runtime import AlexaExposureManagerRuntime
@@ -20,6 +21,33 @@ async def execute(func, *args):
 
 async def valid():
     return None
+
+
+async def test_backup_health_reports_corrupt_and_incomplete_pairs(tmp_path):
+    managed = ManagedFileTransaction(tmp_path, execute, valid)
+    await managed.async_initialize()
+    before = await managed.async_read()
+    await managed.async_save(
+        expected_revision=before["revision"],
+        expected_entities_revision=before["entities_revision"],
+        expose_new_entities=False,
+        entities=[],
+        known_entity_ids=[],
+        filter_config={"include_domains": ["light"]},
+    )
+    backup = (await managed.async_list_backups())[0]
+    pair = managed.backup_path / backup["id"]
+    (pair / "alexa_exposure_filter.yaml").write_text("include_domains: [broken")
+    damaged = (await managed.async_list_backups())[0]
+    assert damaged["healthy"] is False
+    assert damaged["health_reason"]
+    with pytest.raises(ManagedYamlReadOnlyError):
+        current = await managed.async_read()
+        await managed.async_restore(
+            backup["id"],
+            expected_revision=current["revision"],
+            expected_entities_revision=current["entities_revision"],
+        )
 
 
 async def test_combined_cleanup_counts_overlapping_findings_once(runtime):
