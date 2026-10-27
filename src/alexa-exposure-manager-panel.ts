@@ -534,11 +534,13 @@ export class AlexaExposureManagerPanel extends LitElement {
     return html`<section class="workspace rules-editor" aria-label="Cleanup">
       <h2>Cleanup</h2>
       <p>Preview safe changes to the managed files only. Devices in Home Assistant and Amazon are never deleted. Select findings to stage them in the shared draft.</p>
+      <button type="button" aria-label="Run all cleanup checks" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["duplicates", "missing"])}>Run all cleanup checks</button>
       <button type="button" aria-label="Check duplicate rules" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["duplicates"])}>Check duplicate rules</button>
       <button type="button" aria-label="Check missing references" ?disabled=${this.cleanupBusy || this.saving || this.status?.read_only} @click=${() => this.checkCleanup(["missing"])}>Check missing references</button>
       ${this.cleanupBusy ? html`<p role="status">Checking cleanup…</p>` : nothing}
       ${this.cleanupNotice ? html`<p role="status">${this.cleanupNotice}</p>` : nothing}
       ${this.cleanupFindings ? html`
+        <p>${this.cleanupFindings.length} findings · ${new Set(this.cleanupFindings.filter((item) => item.kind === "missing" || item.section?.endsWith("_entities")).map((item) => item.value)).size} affected entities (counted once)</p>
         ${stale ? html`<p role="status">Draft changed. Run cleanup checks again.</p>` : nothing}
         ${this.cleanupFindings.length ? html`<ul>${this.cleanupFindings.map((finding) => html`<li><label>
           <input type="checkbox" aria-label=${`Select cleanup ${finding.id}`} ?disabled=${stale || this.cleanupBusy} .checked=${this.cleanupSelection.includes(finding.id)} @change=${(event: Event) => {

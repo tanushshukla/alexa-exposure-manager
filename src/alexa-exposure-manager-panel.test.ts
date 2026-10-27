@@ -137,6 +137,31 @@ afterEach(() => {
 });
 
 describe("alexa-exposure-manager-panel", () => {
+  it("runs combined cleanup and invalidates findings after another draft edit", async () => {
+    const responses = configuredResponses();
+    responses["alexa_exposure_manager/preview"] = { cleanup_findings: [
+      { id: "missing:light.gone", kind: "missing", value: "light.gone", count: 1 },
+    ] };
+    const panel = await createPanel(responses);
+    const root = panel.shadowRoot!;
+    root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Run all cleanup checks"]')!.click();
+    await settle(panel);
+    expect(panel.hass.connection.sendMessagePromise).toHaveBeenCalledWith(expect.objectContaining({ cleanup_checks: ["duplicates", "missing"] }));
+    root.querySelector<HTMLInputElement>('[aria-label="Select cleanup missing:light.gone"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Filter rules"]')!.click();
+    await settle(panel);
+    const field = root.querySelector<HTMLTextAreaElement>('[data-filter-key="include_domains"]')!;
+    field.value = "light";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    await settle(panel);
+    root.querySelector<HTMLButtonElement>('[aria-label="Settings"]')!.click();
+    await settle(panel);
+    expect(root.querySelector<HTMLButtonElement>('[aria-label="Stage selected cleanup"]')!.disabled).toBe(true);
+    expect(root.textContent).toContain("Draft changed. Run cleanup checks again.");
+  });
+
   it("checks missing references and stages removal with save-time inventory protection", async () => {
     const responses = configuredResponses();
     responses["alexa_exposure_manager/preview"] = {

@@ -424,6 +424,18 @@ class AlexaExposureManagerRuntime:
                 )
                 preview["cleanup_missing"] = missing
             preview["cleanup_findings"] = findings
+            preview["cleanup_summary"] = {
+                "findings": len(findings),
+                "affected_entities": len(
+                    {
+                        item["value"]
+                        for item in findings
+                        if item["kind"] == "missing"
+                        or item.get("section")
+                        in ("include_entities", "exclude_entities")
+                    }
+                ),
+            }
         # Empty native filters defer to Alexa registry defaults, not include-all.
         for entity in catalog["entities"]:
             if preview["strategy"] == "registry_default":

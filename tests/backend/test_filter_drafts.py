@@ -22,6 +22,31 @@ async def valid():
     return None
 
 
+async def test_combined_cleanup_counts_overlapping_findings_once(runtime):
+    message = {
+        "expose_new_entities": False,
+        "filter_config": {"include_entities": ["light.gone", "light.gone"]},
+        "entities": [{"entity_id": "light.gone", "name": "Old"}],
+        "cleanup_checks": ["duplicates", "missing"],
+    }
+    result = await runtime.async_preview(message)
+    assert len(result["cleanup_findings"]) == 2
+    assert result["cleanup_summary"] == {"findings": 2, "affected_entities": 1}
+    result = await runtime.async_preview(
+        {
+            **message,
+            "cleanup_selected": [item["id"] for item in result["cleanup_findings"]],
+        }
+    )
+    assert result["filter"]["include_entities"] == []
+    assert result["entity_config"] == {}
+    partial = await runtime.async_preview(
+        {**message, "cleanup_selected": ["duplicate:include_entities:light.gone"]}
+    )
+    assert partial["filter"]["include_entities"] == ["light.gone"]
+    assert partial["entity_config"]["light.gone"] == {"name": "Old"}
+
+
 async def test_metadata_only_missing_reference_is_found(runtime):
     preview = await runtime.async_preview(
         {
