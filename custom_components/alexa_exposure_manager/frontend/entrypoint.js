@@ -1,4 +1,4 @@
-//#region node_modules/@lit/reactive-element/css-tag.js
+// node_modules/@lit/reactive-element/css-tag.js
 var e = globalThis, t = e.ShadowRoot && (e.ShadyCSS === void 0 || e.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, n = Symbol(), r = /* @__PURE__ */ new WeakMap(), i = class {
 	constructor(e, t, r) {
 		if (this._$cssResult$ = !0, r !== n) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
@@ -252,8 +252,7 @@ var v = class extends HTMLElement {
 	firstUpdated(e) {}
 };
 v.elementStyles = [], v.shadowRootOptions = { mode: "open" }, v[m("elementProperties")] = /* @__PURE__ */ new Map(), v[m("finalized")] = /* @__PURE__ */ new Map(), ie?.({ ReactiveElement: v }), (f.reactiveElementVersions ??= []).push("2.1.2");
-//#endregion
-//#region node_modules/lit-html/lit-html.js
+// node_modules/lit-html/lit-html.js
 var y = globalThis, b = (e) => e, x = y.trustedTypes, S = x ? x.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, C = "$lit$", w = `lit$${Math.random().toFixed(9).slice(2)}$`, T = "?" + w, ae = `<${T}>`, E = document, D = () => E.createComment(""), O = (e) => e === null || typeof e != "object" && typeof e != "function", k = Array.isArray, oe = (e) => k(e) || typeof e?.[Symbol.iterator] == "function", A = "[ 	\n\f\r]", j = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, M = /-->/g, N = />/g, P = RegExp(`>|${A}(?:([^\\s"'>=/]+)(${A}*=${A}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`, "g"), F = /'/g, I = /"/g, L = /^(?:script|style|textarea|title)$/i, R = ((e) => (t, ...n) => ({
 	_$litType$: e,
 	strings: t,
@@ -508,8 +507,7 @@ var pe = (e, t, n) => {
 X._$litElement$ = !0, X.finalized = !0, Y.litElementHydrateSupport?.({ LitElement: X });
 var me = Y.litElementPolyfillSupport;
 me?.({ LitElement: X }), (Y.litElementVersions ??= []).push("4.2.2");
-//#endregion
-//#region src/translations.ts
+// src/translations.ts
 var he = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PURIFIER.AUTO_ACCESSORY.CAMERA.CHRISTMAS_TREE.COFFEE_MAKER.COMPUTER.CONTACT_SENSOR.DOOR.DOORBELL.EXTERIOR_BLIND.FAN.GAME_CONSOLE.GARAGE_DOOR.HEADPHONES.HUB.INTERIOR_BLIND.LAPTOP.LIGHT.MICROWAVE.MOBILE_PHONE.MOTION_SENSOR.MUSIC_SYSTEM.NETWORK_HARDWARE.OTHER.OVEN.PHONE.PRINTER.REMOTE.ROUTER.SCENE_TRIGGER.SCREEN.SECURITY_PANEL.SECURITY_SYSTEM.SLOW_COOKER.SMARTLOCK.SMARTPLUG.SPEAKER.STREAMING_DEVICE.SWITCH.TABLET.TEMPERATURE_SENSOR.THERMOSTAT.TV.VACUUM_CLEANER.WATER_HEATER.WEARABLE".split("."), ge = {
 	appTitle: "Alexa Exposure Manager",
 	loading: "Loading Alexa exposure configuration...",
@@ -699,8 +697,7 @@ var he = /* @__PURE__ */ "ACTIVITY_TRIGGER.AIR_CONDITIONER.AIR_FRESHENER.AIR_PUR
 function Z(e, t = {}) {
 	return Object.entries(t).reduce((e, [t, n]) => e.replaceAll(`{${t}}`, String(n)), ge[e]);
 }
-//#endregion
-//#region src/filter-rules.ts
+// src/filter-rules.ts
 var Q = [
 	["include_entities", "Included entities"],
 	["exclude_entities", "Excluded entities"],
@@ -2086,7 +2083,6 @@ var Q = [
   `;
 };
 customElements.get("alexa-exposure-manager-panel") || customElements.define("alexa-exposure-manager-panel", $);
-//#endregion
 export { $ as AlexaExposureManagerPanel };
 
 //# sourceMappingURL=entrypoint.js.map
